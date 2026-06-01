@@ -1,0 +1,61 @@
+{
+  "site_name": "Drone Sahas\u0131 (18 kare)",
+  "twin_version": "2.0.0",
+  "last_updated": "2026-06-01T04:36:57.403852+00:00",
+  "asset_summary": {
+    "building_count": 61,
+    "has_water": true,
+    "water_coverage_pct": 3.33,
+    "dataset_type": "real",
+    "stitch_method": "phase_correlation",
+    "elevation_range_m": 16.0,
+    "site_area_m2": 921.7
+  },
+  "description": "REAL drone dataset (mosaic + approx. heightmap). Ingested by ingest_real_dataset.py.",
+  "synthetic": false,
+  "source": {
+    "orthomosaic": "mosaic.jpg",
+    "heightmap": "heightmap.jpg",
+    "mosaic_meta": "mosaic_meta.json",
+    "frames": 18,
+    "frame_native_px": [
+      4000,
+      2250
+    ],
+    "avg_concrete_ratio": 0.418,
+    "stitch_method": "phase_correlation"
+  },
+  "resolution_px": 196,
+  "width_m": 29.4,
+  "height_m": 31.35,
+  "min_elev_m": 0.0,
+  "max_elev_m": 16.0,
+  "elevation_range_m": 16.0,
+  "ground_sample_distance_m": 0.15,
+  "heightmap": "heightmap.png",
+  "heightmap_bits": 16,
+  "heightmap_encoding": "linear 0..65535 maps to [min_elev_m, max_elev_m]",
+  "orthomosaic": "orthomosaic.jpg",
+  "normalmap": "normalmap.png",
+  "buildings": "buildings.json",
+  "has_water": true,
+  "water_level_m": 12.223,
+  "water_coverage": 0.0333,
+  "assumptions": {
+    "note": "Scale is ASSUMED. heightmap.jpg is an 8-bit JPEG with no absolute scale. width/height derived from GSD; elevation range chosen as plausible for a park/campground.",
+    "assumed_gsd_m_per_px": 0.15,
+    "assumed_elev_range_m": [
+      0.0,
+      16.0
+    ],
+    "stitch_processing": "Fast geometric stitch (phase_correlation, stitch_mosaic.py).",
+    "montage_grid": null,
+    "seam_processing": null
+  },
+  "georef": {
+    "origin_lat": 41.0082,
+    "origin_lon": 28.9784,
+    "crs": "EPSG:4326 (stub)",
+    "note": "Top-left (north-west) corner; stub only, not georeferenced."
+  }
+}

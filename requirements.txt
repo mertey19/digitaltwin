@@ -1,0 +1,7 @@
+# Digital twin — data generation / ingestion dependencies.
+# Used by generate_synthetic_site.py, ingest_real_dataset.py, stitch_mosaic.py.
+# (The Three.js viewer needs no Python deps; it loads from a CDN.)
+numpy>=1.24
+Pillow>=10.0
+opencv-python>=4.8
+rasterio>=1.3

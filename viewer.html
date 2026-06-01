@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Dijital İkiz — Gerçek Saha Görüntüleyici</title>
+<style>
+  :root { --panel-bg: rgba(18,20,26,0.82); --accent: #5fb0ff; --txt: #e8ecf2; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--txt); }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  /* ---- Loading screen ---- */
+  #loader { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px;
+    background: radial-gradient(120% 120% at 50% 30%, #1b2330 0%, #0b0d12 70%);
+    transition: opacity .6s ease; }
+  #loader.hidden { opacity: 0; pointer-events: none; }
+  .spinner { width: 46px; height: 46px; border: 4px solid rgba(255,255,255,.15);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loader .title { font-size: 18px; font-weight: 600; letter-spacing: .3px; }
+  #loader .status { font-size: 13px; opacity: .7; }
+
+  /* ---- Panels ---- */
+  .panel { position: fixed; z-index: 20; background: var(--panel-bg);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 14px 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+  #controls { top: 14px; right: 14px; width: 264px; max-height: calc(100vh - 28px);
+    overflow-y: auto; }
+  #hud { left: 14px; bottom: 14px; font-size: 12px; line-height: 1.7; min-width: 220px; }
+  #title-card { top: 14px; left: 14px; padding: 10px 14px; max-width: 320px; }
+  #title-card h1 { margin: 0; font-size: 15px; font-weight: 700; }
+  #title-card p { margin: 2px 0 0; font-size: 11px; opacity: .65; }
+
+  .row { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin: 9px 0; font-size: 12.5px; }
+  .row label { opacity: .85; }
+  .row .val { font-variant-numeric: tabular-nums; opacity: .6; min-width: 38px; text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select { width: 100%; padding: 6px; background: rgba(255,255,255,.06); color: var(--txt);
+    border: 1px solid rgba(255,255,255,.18); border-radius: 7px; font-size: 12.5px; }
+  .slider-row { display: block; margin: 11px 0; font-size: 12.5px; }
+  .slider-row .head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  button { width: 100%; padding: 8px; margin-top: 6px; cursor: pointer;
+    background: rgba(95,176,255,.14); color: var(--txt);
+    border: 1px solid rgba(95,176,255,.35); border-radius: 8px; font-size: 12.5px; }
+  button:hover { background: rgba(95,176,255,.26); }
+  .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .hud-key { opacity: .6; } .hud-val { float: right; font-variant-numeric: tabular-nums; }
+  hr { border: none; border-top: 1px solid rgba(255,255,255,.08); margin: 11px 0 4px; }
+  .grp-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px;
+    opacity: .45; margin: 10px 0 2px; }
+  .hint { font-size: 10.5px; opacity: .45; margin-top: 10px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="title">Dijital İkiz Yükleniyor</div>
+  <div class="status" id="loader-status">veriler okunuyor…</div>
+</div>
+
+<div class="panel" id="title-card">
+  <h1 id="title">Gerçek Saha — Dijital İkiz</h1>
+  <p id="subtitle">drone orthomosaic + DSM</p>
+</div>
+
+<div class="panel" id="controls">
+  <div class="slider-row">
+    <div class="head"><label>Veri kümesi</label></div>
+    <select id="dataset">
+      <option value="data_real">Gerçek veri (data_real)</option>
+      <option value="data">Sentetik (data)</option>
+    </select>
+  </div>
+
+  <div class="grp-title">Performans</div>
+  <div class="slider-row">
+    <div class="head"><label>Kalite ön ayarı</label></div>
+    <select id="perf">
+      <option value="performance">Performans (düşük gölge)</option>
+      <option value="balanced" selected>Dengeli</option>
+      <option value="quality">Kalite (yüksek gölge)</option>
+    </select>
+  </div>
+
+  <div class="grp-title">Arazi</div>
+  <div class="slider-row">
+    <div class="head"><label>Dikey abartı (×)</label><span class="val" id="exag-val">1.5</span></div>
+    <input type="range" id="exag" min="0.2" max="6" step="0.1" value="1.5" />
+  </div>
+  <div class="slider-row">
+    <div class="head"><label>Detay (mesh)</label></div>
+    <select id="detail">
+      <option value="256" selected>Düşük (256)</option>
+      <option value="448">Orta (448)</option>
+      <option value="640">Yüksek (640)</option>
+    </select>
+  </div>
+  <div class="row toggle"><input type="checkbox" id="gpudisp" /> <label for="gpudisp">GPU yer değiştirme (displacementMap)</label></div>
+  <div class="row toggle"><input type="checkbox" id="wire" /> <label for="wire">Tel kafes (wireframe)</label></div>
+
+  <div class="grp-title">Sahne nesneleri</div>
+  <div class="row toggle"><input type="checkbox" id="buildingschk" checked /> <label for="buildingschk">Binalar (3B prizma)</label></div>
+  <div class="row toggle"><input type="checkbox" id="waterchk" checked /> <label for="waterchk">Su yüzeyi</label></div>
+
+  <div class="grp-title">Aydınlatma & atmosfer</div>
+  <div class="slider-row">
+    <div class="head"><label>Güneş açısı (azimut)</label><span class="val" id="az-val">315°</span></div>
+    <input type="range" id="az" min="0" max="360" step="1" value="315" />
+  </div>
+  <div class="slider-row">
+    <div class="head"><label>Güneş yüksekliği</label><span class="val" id="el-val">42°</span></div>
+    <input type="range" id="el" min="2" max="89" step="1" value="42" />
+  </div>
+  <div class="slider-row">
+    <div class="head"><label>Pozlama (exposure)</label><span class="val" id="exp-val">1.0</span></div>
+    <input type="range" id="exp" min="0.3" max="2.5" step="0.05" value="1.0" />
+  </div>
+  <div class="row toggle"><input type="checkbox" id="fogchk" checked /> <label for="fogchk">Sis (fog)</label></div>
+  <div class="row toggle"><input type="checkbox" id="ssaochk" /> <label for="ssaochk">SSAO (ortam gölgesi)</label></div>
+
+  <button id="reset">Görünümü sıfırla</button>
+  <div class="hint">Sürükle: döndür · Sağ tık sürükle: kaydır · Tekerlek: yakınlaş</div>
+</div>
+
+<div class="panel" id="hud">
+  <div><span class="hud-key">Saha</span><span class="hud-val" id="hud-size">—</span></div>
+  <div><span class="hud-key">Yükseklik aralığı</span><span class="hud-val" id="hud-elev">—</span></div>
+  <div><span class="hud-key">GSD (çözünürlük)</span><span class="hud-val" id="hud-gsd">—</span></div>
+  <div><span class="hud-key">Mesh</span><span class="hud-val" id="hud-mesh">—</span></div>
+  <div><span class="hud-key">Binalar</span><span class="hud-val" id="hud-buildings">—</span></div>
+  <div><span class="hud-key">Su seviyesi</span><span class="hud-val" id="hud-water">—</span></div>
+  <hr>
+  <div><span class="hud-key">FPS</span><span class="hud-val" id="hud-fps">—</span></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// --- dataset selection (query param ?data=...) --------------------------- //
+const params = new URLSearchParams(location.search);
+const DATA_DIR = params.get('data') || 'data_real';
+const DATA = `./${DATA_DIR}`;
+
+const statusEl = document.getElementById('loader-status');
+const setStatus = (t) => { statusEl.textContent = t; };
+
+// ----------------------------------------------------------------------- //
+//  Asset loading helpers                                                   //
+// ----------------------------------------------------------------------- //
+function loadImageData(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      resolve(ctx.getImageData(0, 0, c.width, c.height));
+    };
+    img.onerror = () => reject(new Error('Görsel yüklenemedi: ' + url));
+    img.src = url;
+  });
+}
+
+function loadTexture(url) {
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(url, resolve, undefined,
+      () => reject(new Error('Doku yüklenemedi: ' + url)));
+  });
+}
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url} -> HTTP ${r.status}`);
+  return r.json();
+}
+
+// Bilinear sample of the red channel from ImageData (normalized 0..1).
+// (u, v) with v=0 at the TOP row of the image.
+function sampleBilinear(imgData, u, v) {
+  const w = imgData.width, h = imgData.height, d = imgData.data;
+  u = Math.min(Math.max(u, 0), 1); v = Math.min(Math.max(v, 0), 1);
+  const x = u * (w - 1), y = v * (h - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const x1 = Math.min(x0 + 1, w - 1), y1 = Math.min(y0 + 1, h - 1);
+  const fx = x - x0, fy = y - y0;
+  const at = (px, py) => d[(py * w + px) * 4] / 255;
+  const top = at(x0, y0) * (1 - fx) + at(x1, y0) * fx;
+  const bot = at(x0, y1) * (1 - fx) + at(x1, y1) * fx;
+  return top * (1 - fy) + bot * fy;
+}
+
+// ----------------------------------------------------------------------- //
+//  Globals                                                                 //
+// ----------------------------------------------------------------------- //
+let renderer, scene, camera, controls, sun, sky;
+let composer = null, ssaoPass = null, renderPass = null, outputPass = null, useSSAO = false;
+let terrain, geometry, terrainMaterial, heightTexture;
+let buildingsGroup = null, buildingData = null, buildingMesh = null, buildingGeo = null;
+let water = null, waterMat = null;
+let meta, heightData;
+let baseHeights;          // Float32Array elevation (m) per terrain vertex
+let initialCamPos, initialTarget;
+let exag = 1.5, gpuDisplace = false, currentDetail = 256;
+let shadowMapSize = 1024;
+const PERF_PRESETS = {
+  performance: { detail: 256, shadow: 1024, pixelRatio: 1.25, ssao: false },
+  balanced:    { detail: 448, shadow: 1024, pixelRatio: 1.75, ssao: false },
+  quality:     { detail: 640, shadow: 2048, pixelRatio: 2.0,  ssao: true  },
+};
+const clock = new THREE.Clock();
+
+// ----------------------------------------------------------------------- //
+//  Init                                                                    //
+// ----------------------------------------------------------------------- //
+async function init() {
+  setStatus('site_meta.json okunuyor…');
+  meta = await fetchJSON(`${DATA}/site_meta.json`);
+
+  setStatus('orthomosaic yükleniyor…');
+  const albedo = await loadTexture(`${DATA}/${meta.orthomosaic}`);
+  albedo.colorSpace = THREE.SRGBColorSpace;
+  albedo.anisotropy = 8;
+
+  let normalTex = null;
+  if (meta.normalmap) {
+    setStatus('normalmap yükleniyor…');
+    try { normalTex = await loadTexture(`${DATA}/${meta.normalmap}`); } catch (e) {}
+  }
+
+  setStatus('heightmap çözülüyor…');
+  heightData = await loadImageData(`${DATA}/${meta.heightmap}`);
+  heightTexture = await loadTexture(`${DATA}/${meta.heightmap}`);
+  heightTexture.colorSpace = THREE.NoColorSpace;
+  heightTexture.wrapS = heightTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+  // buildings.json is optional (only the real dataset ships it)
+  buildingData = null;
+  if (meta.buildings) {
+    setStatus('binalar okunuyor…');
+    try { buildingData = await fetchJSON(`${DATA}/${meta.buildings}`); } catch (e) {}
+  }
+
+  setStatus('sahne oluşturuluyor…');
+  buildScene(albedo, normalTex);
+  buildTerrain(currentDetail);
+  buildBuildings();
+  buildWater();
+  buildHUD();
+  wireControls();
+
+  window.addEventListener('resize', onResize);
+  document.getElementById('loader').classList.add('hidden');
+  animate();
+}
+
+function buildScene(albedo, normalTex) {
+  const app = document.getElementById('app');
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, PERF_PRESETS.performance.pixelRatio));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  app.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+
+  const W = meta.width_m, H = meta.height_m;
+  const diag = Math.hypot(W, H);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, diag * 8);
+  initialCamPos = new THREE.Vector3(W * 0.15, meta.max_elev_m * 3 + diag * 0.42, H * 1.1 + diag * 0.18);
+  initialTarget = new THREE.Vector3(0, meta.max_elev_m * 0.5, 0);
+  camera.position.copy(initialCamPos);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.maxPolarAngle = Math.PI * 0.495; // don't go under the ground
+  controls.minDistance = diag * 0.05;
+  controls.maxDistance = diag * 3.0;
+  controls.target.copy(initialTarget);
+
+  // ---- Sky ----
+  sky = new Sky();
+  sky.scale.setScalar(diag * 12);
+  scene.add(sky);
+  const su = sky.material.uniforms;
+  su['turbidity'].value = 6;
+  su['rayleigh'].value = 1.8;
+  su['mieCoefficient'].value = 0.005;
+  su['mieDirectionalG'].value = 0.8;
+
+  // ---- Lights ----
+  sun = new THREE.DirectionalLight(0xfff3e0, 2.6);
+  sun.castShadow = true;
+  const shadowCam = sun.shadow.camera;
+  const ext = diag * 0.6;
+  shadowCam.left = -ext; shadowCam.right = ext;
+  shadowCam.top = ext; shadowCam.bottom = -ext;
+  shadowCam.near = 0.5; shadowCam.far = diag * 5;
+  sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.6;
+  scene.add(sun);
+  scene.add(sun.target);
+
+  const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x4a4234, 0.55);
+  scene.add(hemi);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+
+  // ---- Fog ----
+  scene.fog = new THREE.Fog(0xc8d6e8, diag * 1.1, diag * 3.6);
+
+  // ---- Terrain material ----
+  terrainMaterial = new THREE.MeshStandardMaterial({
+    map: albedo,
+    roughness: 0.95,
+    metalness: 0.0,
+  });
+  if (normalTex) {
+    normalTex.colorSpace = THREE.NoColorSpace;
+    terrainMaterial.normalMap = normalTex;
+    terrainMaterial.normalScale = new THREE.Vector2(1.1, 1.1);
+  }
+
+  // ---- Environment (sky reflections for water) ----
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    const skyClone = new Sky();
+    skyClone.scale.setScalar(diag * 12);
+    const u2 = skyClone.material.uniforms;
+    for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG'])
+      u2[k].value = su[k].value;
+    u2['sunPosition'].value.set(0.4, 0.7, 0.4).normalize();
+    envScene.add(skyClone);
+    scene.environment = pmrem.fromScene(envScene).texture;
+    pmrem.dispose();
+  } catch (e) { /* env optional */ }
+
+  updateSun(315, 42);
+}
+
+// ----------------------------------------------------------------------- //
+//  Terrain                                                                 //
+// ----------------------------------------------------------------------- //
+function buildTerrain(detail) {
+  if (terrain) { scene.remove(terrain); geometry.dispose(); }
+  const W = meta.width_m, H = meta.height_m;
+  // keep the aspect ratio of the heightmap in the segment counts
+  const aspect = heightData.width / heightData.height;
+  const segX = Math.min(detail, heightData.width - 1);
+  const segY = Math.max(8, Math.min(Math.round(detail / aspect), heightData.height - 1));
+
+  geometry = new THREE.PlaneGeometry(W, H, segX, segY);
+  const pos = geometry.attributes.position;
+  const count = pos.count;
+  baseHeights = new Float32Array(count);
+
+  const minE = meta.min_elev_m, maxE = meta.max_elev_m;
+  for (let i = 0; i < count; i++) {
+    const x = pos.getX(i), y = pos.getY(i);
+    const u = (x + W / 2) / W;
+    const vPlane = (y + H / 2) / H;
+    // image row 0 = top; plane +y = top, so image v = 1 - vPlane
+    const elevN = sampleBilinear(heightData, u, 1 - vPlane);
+    baseHeights[i] = minE + elevN * (maxE - minE);
+  }
+
+  terrain = new THREE.Mesh(geometry, terrainMaterial);
+  terrain.rotation.x = -Math.PI / 2; // lay flat, +Y up
+  terrain.castShadow = true;
+  terrain.receiveShadow = true;
+  scene.add(terrain);
+
+  applyDisplacement();
+  document.getElementById('hud-mesh').textContent =
+    `${segX + 1}×${segY + 1} (${(count / 1000).toFixed(0)}k tepe)`;
+}
+
+// Applies either CPU vertex displacement (default, correct shadows) or GPU
+// displacementMap (finer detail). Both honour the current vertical exaggeration.
+function applyDisplacement() {
+  const minE = meta.min_elev_m, maxE = meta.max_elev_m;
+  const pos = geometry.attributes.position;
+  if (gpuDisplace) {
+    for (let i = 0; i < pos.count; i++) pos.setZ(i, 0);
+    pos.needsUpdate = true;
+    geometry.computeVertexNormals();
+    terrainMaterial.displacementMap = heightTexture;
+    terrainMaterial.displacementScale = (maxE - minE) * exag;
+    terrainMaterial.displacementBias = minE * exag;
+  } else {
+    terrainMaterial.displacementMap = null;
+    terrainMaterial.displacementScale = 0;
+    terrainMaterial.displacementBias = 0;
+    for (let i = 0; i < pos.count; i++) pos.setZ(i, baseHeights[i] * exag);
+    pos.needsUpdate = true;
+    geometry.computeVertexNormals();
+  }
+  terrainMaterial.needsUpdate = true;
+}
+
+// World-space elevation (metres, already exaggerated) at image UV (v=0 top).
+function terrainElevationAt(u, v) {
+  const n = sampleBilinear(heightData, u, v);
+  return (meta.min_elev_m + n * (meta.max_elev_m - meta.min_elev_m)) * exag;
+}
+
+// ----------------------------------------------------------------------- //
+//  3D Buildings (extruded prisms placed on the terrain)                    //
+// ----------------------------------------------------------------------- //
+function buildBuildings() {
+  if (buildingMesh) { buildingsGroup.remove(buildingMesh); buildingGeo.dispose(); buildingMesh = null; }
+  const list = buildingData && buildingData.buildings ? buildingData.buildings : [];
+  document.getElementById('hud-buildings').textContent = list.length ? `${list.length} adet` : 'yok';
+  if (!list.length) return;
+
+  if (!buildingsGroup) { buildingsGroup = new THREE.Group(); scene.add(buildingsGroup); }
+
+  buildingGeo = new THREE.BoxGeometry(1, 1, 1); // unit cube, scaled per instance
+  const mat = new THREE.MeshStandardMaterial({ color: 0xb8b2a6, roughness: 0.82, metalness: 0.04 });
+  buildingMesh = new THREE.InstancedMesh(buildingGeo, mat, list.length);
+  buildingMesh.castShadow = true;
+  buildingMesh.receiveShadow = true;
+  buildingMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3), 3);
+  buildingsGroup.add(buildingMesh);
+  positionBuildings();
+}
+
+function positionBuildings() {
+  if (!buildingMesh) return;
+  const W = meta.width_m, H = meta.height_m;
+  const list = buildingData.buildings;
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  const col = new THREE.Color();
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    const wx = (b.u - 0.5) * W;
+    const wz = (b.v - 0.5) * H;
+    const baseY = terrainElevationAt(b.u, b.v);
+    const hgt = b.height_m * exag;
+    p.set(wx, baseY + hgt / 2, wz);
+    s.set(Math.max(1.5, b.su * W), hgt, Math.max(1.5, b.sv * H));
+    m.compose(p, q, s);
+    buildingMesh.setMatrixAt(i, m);
+    // subtle concrete tone variation per building
+    const t = 0.78 + 0.18 * (b.density || 0.4);
+    col.setRGB(t, t * 0.97, t * 0.9);
+    buildingMesh.setColorAt(i, col);
+  }
+  buildingMesh.instanceMatrix.needsUpdate = true;
+  if (buildingMesh.instanceColor) buildingMesh.instanceColor.needsUpdate = true;
+}
+
+// ----------------------------------------------------------------------- //
+//  Water surface                                                           //
+// ----------------------------------------------------------------------- //
+function buildWater() {
+  if (water) { scene.remove(water); water.geometry.dispose(); water = null; }
+  if (!meta.has_water) { document.getElementById('hud-water').textContent = 'yok'; return; }
+
+  const W = meta.width_m, H = meta.height_m;
+  const geo = new THREE.PlaneGeometry(W, H, 64, 24);
+  waterMat = new THREE.MeshStandardMaterial({
+    color: 0x2f6f7e,
+    roughness: 0.12,
+    metalness: 0.0,
+    transparent: true,
+    opacity: 0.62,
+    envMapIntensity: 1.2,
+  });
+  water = new THREE.Mesh(geo, waterMat);
+  water.rotation.x = -Math.PI / 2;
+  water.receiveShadow = true;
+  water.renderOrder = 1;
+  scene.add(water);
+  updateWaterLevel();
+  document.getElementById('hud-water').textContent = `${meta.water_level_m.toFixed(1)} m`;
+}
+
+function updateWaterLevel() {
+  if (water) water.position.y = (meta.water_level_m || 0) * exag;
+}
+
+function animateWater(t) {
+  if (!water) return;
+  const pos = water.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i);
+    pos.setZ(i, Math.sin(x * 0.06 + t * 1.1) * 0.18 + Math.cos(y * 0.08 + t * 0.9) * 0.18);
+  }
+  pos.needsUpdate = true;
+}
+
+// ----------------------------------------------------------------------- //
+//  Sun / sky                                                               //
+// ----------------------------------------------------------------------- //
+function updateSun(azDeg, elDeg) {
+  const az = THREE.MathUtils.degToRad(azDeg);
+  const el = THREE.MathUtils.degToRad(elDeg);
+  const r = Math.hypot(meta.width_m, meta.height_m);
+  const dir = new THREE.Vector3(
+    Math.cos(el) * Math.cos(az),
+    Math.sin(el),
+    Math.cos(el) * Math.sin(az)
+  );
+  sun.position.copy(dir.clone().multiplyScalar(r));
+  sun.target.position.set(0, 0, 0);
+  if (sky) sky.material.uniforms['sunPosition'].value.copy(dir);
+  const t = Math.max(0, Math.sin(el));
+  sun.intensity = 0.6 + 2.4 * t;
+  sun.color.setHSL(0.09 + 0.02 * t, 0.6 - 0.3 * t, 0.55 + 0.1 * t);
+}
+
+// ----------------------------------------------------------------------- //
+//  HUD + controls                                                          //
+// ----------------------------------------------------------------------- //
+function buildHUD() {
+  document.getElementById('hud-size').textContent =
+    `${meta.width_m} × ${meta.height_m} m`;
+  document.getElementById('hud-elev').textContent =
+    `${meta.min_elev_m.toFixed(1)} – ${meta.max_elev_m.toFixed(1)} m`;
+  document.getElementById('hud-gsd').textContent =
+    `${meta.ground_sample_distance_m} m/px`;
+  document.getElementById('subtitle').textContent =
+    meta.synthetic ? 'sentetik DSM + orthomosaic (WebODM uyumlu)'
+                   : 'gerçek drone orthomosaic + (yaklaşık) DSM';
+  document.getElementById('title').textContent =
+    meta.synthetic ? 'Sentetik Saha — Dijital İkiz' : 'Gerçek Saha — Dijital İkiz';
+}
+
+function applyPerfPreset(name) {
+  const p = PERF_PRESETS[name] || PERF_PRESETS.balanced;
+  currentDetail = p.detail;
+  shadowMapSize = p.shadow;
+  document.getElementById('detail').value = String(p.detail);
+  if (sun) sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
+  if (renderer) renderer.setPixelRatio(Math.min(window.devicePixelRatio, p.pixelRatio));
+  document.getElementById('ssaochk').checked = p.ssao;
+  setSSAO(p.ssao);
+  if (terrain) buildTerrain(currentDetail);
+}
+
+function wireControls() {
+  const perfSel = document.getElementById('perf');
+  perfSel.addEventListener('change', () => applyPerfPreset(perfSel.value));
+
+  const datasetSel = document.getElementById('dataset');
+  datasetSel.value = DATA_DIR === 'data' ? 'data' : 'data_real';
+  datasetSel.addEventListener('change', () => {
+    const p = new URLSearchParams(location.search);
+    p.set('data', datasetSel.value);
+    location.search = p.toString();
+  });
+
+  const exagEl = document.getElementById('exag');
+  exagEl.value = exag;
+  document.getElementById('exag-val').textContent = (+exag).toFixed(1);
+  exagEl.addEventListener('input', () => {
+    exag = +exagEl.value;
+    document.getElementById('exag-val').textContent = exag.toFixed(1);
+    applyDisplacement();
+    positionBuildings();
+    updateWaterLevel();
+  });
+
+  document.getElementById('detail').addEventListener('change', (e) => {
+    currentDetail = +e.target.value;
+    buildTerrain(currentDetail);
+  });
+
+  document.getElementById('gpudisp').addEventListener('change', (e) => {
+    gpuDisplace = e.target.checked;
+    applyDisplacement();
+  });
+
+  const az = document.getElementById('az'), el = document.getElementById('el');
+  const onSun = () => {
+    document.getElementById('az-val').textContent = az.value + '°';
+    document.getElementById('el-val').textContent = el.value + '°';
+    updateSun(+az.value, +el.value);
+  };
+  az.addEventListener('input', onSun);
+  el.addEventListener('input', onSun);
+
+  const exp = document.getElementById('exp');
+  exp.addEventListener('input', () => {
+    renderer.toneMappingExposure = +exp.value;
+    document.getElementById('exp-val').textContent = (+exp.value).toFixed(2);
+  });
+
+  document.getElementById('wire').addEventListener('change', (e) => {
+    terrainMaterial.wireframe = e.target.checked;
+  });
+  document.getElementById('buildingschk').addEventListener('change', (e) => {
+    if (buildingsGroup) buildingsGroup.visible = e.target.checked;
+  });
+  document.getElementById('waterchk').addEventListener('change', (e) => {
+    if (water) water.visible = e.target.checked;
+  });
+  document.getElementById('fogchk').addEventListener('change', (e) => {
+    const d = Math.hypot(meta.width_m, meta.height_m);
+    scene.fog = e.target.checked ? new THREE.Fog(0xc8d6e8, d * 1.1, d * 3.6) : null;
+  });
+  document.getElementById('ssaochk').addEventListener('change', (e) => {
+    setSSAO(e.target.checked);
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    camera.position.copy(initialCamPos);
+    controls.target.copy(initialTarget);
+    controls.update();
+  });
+}
+
+// ----------------------------------------------------------------------- //
+//  SSAO (lazy-initialised so a clean load never touches the composer)      //
+// ----------------------------------------------------------------------- //
+function setSSAO(enabled) {
+  if (enabled && !composer) {
+    try {
+      composer = new EffectComposer(renderer);
+      renderPass = new RenderPass(scene, camera);
+      ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+      ssaoPass.kernelRadius = 8;
+      ssaoPass.minDistance = 0.0008;
+      ssaoPass.maxDistance = 0.06;
+      outputPass = new OutputPass();
+      composer.addPass(renderPass);
+      composer.addPass(ssaoPass);
+      composer.addPass(outputPass);
+    } catch (err) {
+      console.warn('SSAO başlatılamadı, devre dışı:', err);
+      composer = null;
+      document.getElementById('ssaochk').checked = false;
+      return;
+    }
+  }
+  useSSAO = enabled && !!composer;
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ----------------------------------------------------------------------- //
+//  Render loop                                                             //
+// ----------------------------------------------------------------------- //
+let lastT = performance.now(), frames = 0, fpsT = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = now - lastT; lastT = now;
+  frames++; fpsT += dt;
+  if (fpsT >= 500) {
+    document.getElementById('hud-fps').textContent = Math.round(1000 * frames / fpsT);
+    frames = 0; fpsT = 0;
+  }
+  controls.update();
+  animateWater(clock.getElapsedTime());
+  if (useSSAO && composer) composer.render();
+  else renderer.render(scene, camera);
+}
+
+init().catch((err) => {
+  console.error(err);
+  setStatus('HATA: ' + err.message + '  (serve.py ile http üzerinden açtınız mı?)');
+});
+</script>
+</body>
+</html>

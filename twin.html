@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Dijital İkiz Platformu</title>
+<style>
+  :root {
+    --bg: #0a0c10; --panel: rgba(14,17,24,0.92); --panel-border: rgba(255,255,255,.07);
+    --accent: #4da3ff; --accent-dim: rgba(77,163,255,.15); --txt: #e4e9f0; --muted: rgba(228,233,240,.55);
+    --ok: #3dd68c; --warn: #f5c542; --err: #ff5c5c;
+    --sidebar-w: 300px; --status-h: 34px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+    font-family: "Segoe UI", system-ui, sans-serif; color: var(--txt); font-size: 13px; }
+  #app { position: fixed; inset: 0; bottom: var(--status-h); }
+  canvas { display: block; }
+
+  /* Loading */
+  #loader { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: radial-gradient(120% 120% at 50% 20%, #1a2230 0%, var(--bg) 70%); transition: opacity .5s; }
+  #loader.hidden { opacity: 0; pointer-events: none; }
+  .load-bar { width: 280px; height: 4px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; }
+  .load-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+  .load-pct { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .load-msg { font-size: 12px; color: var(--muted); }
+
+  /* Layout panels */
+  .panel { position: fixed; z-index: 20; background: var(--panel); backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+  #header { top: 10px; left: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; max-width: 360px; }
+  #header h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.2; }
+  #header .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex-shrink: 0;
+    box-shadow: 0 0 0 0 rgba(61,214,140,.6); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(61,214,140,.5); } 50% { box-shadow: 0 0 0 8px rgba(61,214,140,0); } }
+  .live-label { font-size: 10px; font-weight: 700; color: var(--ok); letter-spacing: .5px; }
+
+  #sidebar { top: 10px; right: 10px; width: var(--sidebar-w); max-height: calc(100% - var(--status-h) - 20px);
+    overflow-y: auto; padding: 12px 14px; transition: transform .3s, opacity .3s; }
+  #sidebar.collapsed { transform: translateX(calc(var(--sidebar-w) + 20px)); opacity: 0; pointer-events: none; }
+  .panel-toggle { position: fixed; top: 10px; right: 10px; z-index: 25; width: 36px; height: 36px;
+    border-radius: 8px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--txt);
+    cursor: pointer; font-size: 16px; display: none; }
+  @media (max-width: 900px) { .panel-toggle { display: block; } :root { --sidebar-w: 260px; } }
+
+  .sec-title { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin: 12px 0 6px; }
+  .sec-title:first-child { margin-top: 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { background: rgba(255,255,255,.04); border-radius: 7px; padding: 8px 10px; }
+  .stat .k { font-size: 10px; color: var(--muted); }
+  .stat .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .stat .u { font-size: 10px; color: var(--muted); font-weight: 400; }
+
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+  .badge.ok { background: rgba(61,214,140,.18); color: var(--ok); }
+  .badge.warn { background: rgba(245,197,66,.18); color: var(--warn); }
+  .badge.err { background: rgba(255,92,92,.18); color: var(--err); }
+
+  #building-list { max-height: 140px; overflow-y: auto; font-size: 11px; }
+  #building-list .row { display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; }
+  #building-list .row:hover { color: var(--accent); }
+
+  #statusbar { position: fixed; bottom: 0; left: 0; right: 0; height: var(--status-h); z-index: 30;
+    background: rgba(8,10,14,.95); border-top: 1px solid var(--panel-border);
+    display: flex; align-items: center; padding: 0 12px; gap: 16px; font-size: 11px; color: var(--muted); }
+  #statusbar span { font-variant-numeric: tabular-nums; }
+  #statusbar .sep { opacity: .3; }
+
+  #controls-left { left: 10px; bottom: calc(var(--status-h) + 10px); padding: 10px 12px; width: 220px;
+    max-height: calc(100% - var(--status-h) - 80px); overflow-y: auto; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; font-size: 12px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select, .tool-btn { width: 100%; padding: 6px 8px; background: rgba(255,255,255,.05); color: var(--txt);
+    border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .tool-btn { margin-top: 4px; text-align: center; }
+  .tool-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .tool-row { display: flex; gap: 4px; }
+  .tool-row .tool-btn { flex: 1; font-size: 11px; padding: 5px; }
+  button.action { padding: 7px 10px; background: var(--accent-dim); border: 1px solid rgba(77,163,255,.35);
+    color: var(--txt); border-radius: 7px; cursor: pointer; font-size: 12px; width: 100%; margin-top: 6px; }
+  button.action:hover { background: rgba(77,163,255,.28); }
+  label.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
+
+  #minimap { top: 10px; right: calc(var(--sidebar-w) + 20px); width: 160px; height: 120px; padding: 4px;
+    cursor: crosshair; transition: right .3s; }
+  #minimap canvas { width: 100%; height: 100%; border-radius: 6px; display: block; }
+  #minimap .lbl { position: absolute; top: 8px; left: 8px; font-size: 9px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .5px; pointer-events: none; }
+  @media (max-width: 900px) { #minimap { right: 56px; } }
+
+  #inspect { left: 50%; bottom: calc(var(--status-h) + 14px); transform: translateX(-50%);
+    padding: 12px 16px; min-width: 260px; max-width: 340px; display: none; }
+  #inspect.visible { display: block; }
+  #inspect h3 { margin: 0 0 8px; font-size: 14px; }
+  #inspect .close { position: absolute; top: 8px; right: 10px; background: none; border: none;
+    color: var(--muted); cursor: pointer; font-size: 16px; }
+  #inspect dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12px; }
+  #inspect dt { color: var(--muted); }
+  #inspect dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+  #measure-label { position: fixed; z-index: 15; pointer-events: none; background: rgba(0,0,0,.75);
+    padding: 4px 8px; border-radius: 4px; font-size: 11px; display: none; color: #fff; }
+  .crosshair-cursor { cursor: crosshair !important; }
+
+  #alarm-list { max-height: 100px; overflow-y: auto; font-size: 11px; }
+  #alarm-list .alm { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+  #iot-panel { font-size: 11px; color: var(--muted); padding: 8px; background: rgba(255,255,255,.03);
+    border-radius: 6px; border: 1px dashed rgba(255,255,255,.12); }
+  #profile-panel { left: 50%; top: 50%; transform: translate(-50%,-50%); padding: 12px 16px;
+    min-width: 320px; display: none; z-index: 40; }
+  #profile-panel.visible { display: block; }
+  #profile-canvas { width: 100%; height: 120px; background: rgba(0,0,0,.3); border-radius: 6px; display: block; }
+  .compare-overlay { pointer-events: none; position: fixed; inset: 0; bottom: var(--status-h);
+    z-index: 5; mix-blend-mode: multiply; opacity: 0; transition: opacity .4s; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="loader">
+  <div class="load-pct" id="load-pct">0%</div>
+  <div class="load-bar"><i id="load-bar"></i></div>
+  <div class="load-msg" id="load-msg">Dijital ikiz başlatılıyor…</div>
+</div>
+
+<div class="panel" id="header">
+  <div class="live-dot"></div>
+  <div>
+    <div class="live-label">CANLI</div>
+    <h1 id="site-name">Dijital İkiz</h1>
+    <div class="sub" id="site-sub">yükleniyor…</div>
+  </div>
+</div>
+
+<button class="panel-toggle" id="panel-toggle" title="Panel">☰</button>
+
+<div class="panel" id="sidebar">
+  <div class="sec-title">Saha Özeti</div>
+  <div class="stat-grid">
+    <div class="stat"><div class="k">Boyut</div><div class="v" id="ov-size">—</div></div>
+    <div class="stat"><div class="k">Yükseklik</div><div class="v" id="ov-elev">—</div></div>
+    <div class="stat"><div class="k">Bina</div><div class="v" id="ov-buildings">—</div></div>
+    <div class="stat"><div class="k">Su seviyesi</div><div class="v" id="ov-water">—<span class="u"> m</span></div></div>
+  </div>
+  <div class="row" style="margin-top:8px;font-size:11px;color:var(--muted)">
+    <span id="ov-dataset">—</span><span id="ov-updated">—</span>
+  </div>
+
+  <div class="sec-title">Canlı Telemetri</div>
+  <div class="stat-grid">
+    <div class="stat"><div class="k">Sıcaklık</div><div class="v"><span id="tel-temp">—</span><span class="u"> °C</span></div></div>
+    <div class="stat"><div class="k">Nem</div><div class="v"><span id="tel-hum">—</span><span class="u"> %</span></div></div>
+    <div class="stat"><div class="k">Rüzgar</div><div class="v"><span id="tel-wind">—</span><span class="u"> m/s</span></div></div>
+    <div class="stat"><div class="k">Güneş</div><div class="v"><span id="tel-solar">—</span><span class="u"> W/m²</span></div></div>
+  </div>
+  <div class="row" style="margin-top:6px"><span>Sistem durumu</span><span class="badge ok" id="sys-badge">Normal</span></div>
+
+  <div class="sec-title">Binalar (telemetri)</div>
+  <div id="building-list"><div style="color:var(--muted);font-size:11px">yükleniyor…</div></div>
+
+  <div class="sec-title">Alarmlar</div>
+  <div id="alarm-overall" class="row"><span>Genel durum</span><span class="badge ok" id="alarm-badge">Normal</span></div>
+  <div id="alarm-list"><div style="color:var(--muted);font-size:11px">—</div></div>
+
+  <div class="sec-title">IoT Bağlantısı</div>
+  <div id="iot-panel">
+    🔌 MQTT/OPC-UA entegrasyonu — yol haritası<br>
+    <span style="font-size:10px">Gerçek sensör akışı için twin_api genişletilebilir.</span>
+    <button class="action" style="margin-top:6px;font-size:11px" id="btn-iot-connect" disabled>Bağlan (yakında)</button>
+  </div>
+</div>
+
+<div class="panel" id="controls-left">
+  <div class="sec-title">Araçlar</div>
+  <div class="tool-row">
+    <button class="tool-btn" data-tool="inspect" id="tool-inspect">İncele</button>
+    <button class="tool-btn" data-tool="measure" id="tool-measure">Mesafe</button>
+    <button class="tool-btn" data-tool="area" id="tool-area">Alan</button>
+    <button class="tool-btn" data-tool="pin" id="tool-pin">Pin</button>
+  </div>
+  <div class="tool-row">
+    <button class="tool-btn" data-tool="profile" id="tool-profile">Profil</button>
+  </div>
+  <div class="sec-title">Görünüm</div>
+  <select id="preset-view">
+    <option value="">Kamera ön ayarı…</option>
+    <option value="bird">Kuş bakışı</option>
+    <option value="north">Kuzey</option>
+    <option value="south">Güney</option>
+    <option value="close">Bina yakın</option>
+  </select>
+  <button class="action" id="btn-screenshot">📷 Ekran görüntüsü</button>
+  <button class="action" id="btn-demo">🎬 Demo turu</button>
+  <button class="action" id="btn-reset">Görünümü sıfırla</button>
+
+  <div class="sec-title">Zaman ekseni (önce/sonra)</div>
+  <div class="row"><label id="time-label">2024 ↔ 2026</label><span id="time-val">2026</span></div>
+  <input type="range" id="time-axis" min="0" max="100" step="1" value="100" />
+
+  <div class="sec-title">Ortam</div>
+  <div class="row"><label>Gün saati</label><span id="tod-val">12:00</span></div>
+  <input type="range" id="tod" min="0" max="24" step="0.25" value="12" />
+  <div class="row"><label>Hava</label></div>
+  <select id="weather">
+    <option value="sunny">☀ Güneşli</option>
+    <option value="cloudy">☁ Bulutlu</option>
+    <option value="rainy">🌧 Yağmurlu</option>
+  </select>
+  <div class="row"><label>Mevsim tonu</label></div>
+  <select id="season">
+    <option value="none">Yok</option>
+    <option value="spring">İlkbahar</option>
+    <option value="summer">Yaz</option>
+    <option value="autumn">Sonbahar</option>
+    <option value="winter">Kış</option>
+  </select>
+
+  <div class="sec-title">Kalite</div>
+  <select id="perf">
+    <option value="performance">Performans</option>
+    <option value="balanced" selected>Dengeli</option>
+    <option value="quality">Kalite</option>
+  </select>
+  <select id="dataset">
+    <option value="data_real">Gerçek veri</option>
+    <option value="data">Sentetik</option>
+  </select>
+  <label class="chk"><input type="checkbox" id="buildingschk" checked /> Binalar</label>
+  <label class="chk"><input type="checkbox" id="waterchk" checked /> Su</label>
+  <label class="chk"><input type="checkbox" id="fogchk" checked /> Sis</label>
+</div>
+
+<div class="panel" id="minimap">
+  <span class="lbl">Mini harita</span>
+  <canvas id="minimap-canvas" width="152" height="112"></canvas>
+</div>
+
+<div class="panel" id="inspect">
+  <button class="close" id="inspect-close">×</button>
+  <h3 id="inspect-title">—</h3>
+  <dl id="inspect-body"></dl>
+</div>
+<div class="panel" id="profile-panel">
+  <button class="close" id="profile-close">×</button>
+  <div class="sec-title" style="margin-top:0">Yükseklik profili</div>
+  <canvas id="profile-canvas" width="300" height="120"></canvas>
+  <div style="font-size:11px;color:var(--muted);margin-top:6px" id="profile-stats">—</div>
+</div>
+<div id="compare-overlay" class="compare-overlay"></div>
+<div id="measure-label"></div>
+
+<div id="statusbar">
+  <span>FPS: <b id="sb-fps">—</b></span><span class="sep">|</span>
+  <span id="sb-coords">Koordinat: —</span><span class="sep">|</span>
+  <span id="sb-tool">Araç: İncele</span><span class="sep">|</span>
+  <span id="sb-api">Telemetri: simülasyon</span>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const params = new URLSearchParams(location.search);
+const DATA_DIR = params.get('data') || 'data_real';
+const DATA = `./${DATA_DIR}`;
+const API_URL = '/api/telemetry';
+const API_ASSETS = '/api/assets';
+const API_ALARMS = '/api/alarms';
+const PINS_KEY = 'dt_pins_' + DATA_DIR;
+
+// --- DOM helpers ---
+const $ = id => document.getElementById(id);
+const loadPct = $('load-pct'), loadBar = $('load-bar'), loadMsg = $('load-msg');
+let loadProgress = 0;
+function setLoad(pct, msg) {
+  loadProgress = Math.min(100, pct);
+  loadPct.textContent = Math.round(loadProgress) + '%';
+  loadBar.style.width = loadProgress + '%';
+  if (msg) loadMsg.textContent = msg;
+}
+
+// --- Smooth display values ---
+const smoothVals = {};
+function smoothDisplay(id, target, decimals = 1) {
+  if (!smoothVals[id]) smoothVals[id] = target;
+  smoothVals[id] += (target - smoothVals[id]) * 0.18;
+  const el = $(id);
+  if (el) el.textContent = smoothVals[id].toFixed(decimals);
+}
+
+// --- Globals ---
+let renderer, scene, camera, controls, sun, sky, hemiLight, ambLight;
+let composer, ssaoPass, useSSAO = false;
+let terrain, geometry, terrainMaterial, heightTexture, heightData, baseHeights;
+let buildingsGroup, buildingMesh, buildingData, buildingGeo;
+let water, waterMat, rainSystem = null;
+let meta, initialCamPos, initialTarget;
+let exag = 1.5, currentDetail = 448, shadowMapSize = 1024;
+let orthoThumb = null;
+const PERF = {
+  performance: { detail: 256, shadow: 1024, pixelRatio: 1.25, ssao: false },
+  balanced:    { detail: 448, shadow: 1024, pixelRatio: 1.75, ssao: false },
+  quality:     { detail: 640, shadow: 2048, pixelRatio: 2.0,  ssao: true  },
+};
+const clock = new THREE.Clock();
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredBuilding = -1;
+const baseBuildingColors = [];
+let telemetry = null, telemetrySource = 'simülasyon';
+let simTelemetry = null, assetsRegistry = null, alarmsData = null;
+let activeTool = 'inspect';
+let measurePoints = [], areaPoints = [], measureLine = null, measureMarkers = [];
+let areaMesh = null, pinGroup = null;
+let profilePoints = [], profileLine = null;
+let demoActive = false, demoStep = 0, demoT = 0;
+let compareOverlay = null;
+let pins = JSON.parse(sessionStorage.getItem(PINS_KEY) || '[]');
+let seasonTint = null;
+
+// --- Load helpers ---
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url} HTTP ${r.status}`);
+  return r.json();
+}
+function loadImageData(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      resolve(ctx.getImageData(0, 0, c.width, c.height));
+    };
+    img.onerror = () => reject(new Error('Görsel: ' + url));
+    img.src = url;
+  });
+}
+function loadTexture(url) {
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(url, resolve, undefined, () => reject(new Error(url)));
+  });
+}
+function sampleBilinear(imgData, u, v) {
+  const w = imgData.width, h = imgData.height, d = imgData.data;
+  u = Math.min(Math.max(u, 0), 1); v = Math.min(Math.max(v, 0), 1);
+  const x = u * (w - 1), y = v * (h - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const x1 = Math.min(x0 + 1, w - 1), y1 = Math.min(y0 + 1, h - 1);
+  const fx = x - x0, fy = y - y0;
+  const at = (px, py) => d[(py * w + px) * 4] / 255;
+  return at(x0,y0)*(1-fx)*(1-fy) + at(x1,y0)*fx*(1-fy) + at(x0,y1)*(1-fx)*fy + at(x1,y1)*fx*fy;
+}
+
+// --- Init ---
+async function init() {
+  setLoad(5, 'site_meta.json okunuyor…');
+  meta = await fetchJSON(`${DATA}/site_meta.json`);
+  setLoad(15, 'Orthomosaic yükleniyor…');
+  const albedo = await loadTexture(`${DATA}/${meta.orthomosaic}`);
+  albedo.colorSpace = THREE.SRGBColorSpace;
+  albedo.anisotropy = 8;
+  orthoThumb = albedo.image;
+
+  let normalTex = null;
+  if (meta.normalmap) {
+    setLoad(30, 'Normal map…');
+    try { normalTex = await loadTexture(`${DATA}/${meta.normalmap}`); } catch (_) {}
+  }
+  setLoad(45, 'Heightmap…');
+  heightData = await loadImageData(`${DATA}/${meta.heightmap}`);
+  heightTexture = await loadTexture(`${DATA}/${meta.heightmap}`);
+  heightTexture.colorSpace = THREE.NoColorSpace;
+
+  buildingData = null;
+  if (meta.buildings) {
+    setLoad(60, 'Binalar…');
+    try { buildingData = await fetchJSON(`${DATA}/${meta.buildings}`); } catch (_) {}
+  }
+  setLoad(75, 'Sahne oluşturuluyor…');
+  buildScene(albedo, normalTex);
+  buildTerrain(currentDetail);
+  buildBuildings();
+  buildWater();
+  buildPins();
+  buildRain();
+  updateOverviewUI();
+  wireUI();
+  initTelemetry();
+  compareOverlay = $('compare-overlay');
+  setLoad(100, 'Hazır');
+  setTimeout(() => $('loader').classList.add('hidden'), 400);
+  animate();
+}
+
+function buildScene(albedo, normalTex) {
+  const app = $('app');
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, PERF.balanced.pixelRatio));
+  renderer.setSize(window.innerWidth, window.innerHeight - 34);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  app.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  const W = meta.width_m, H = meta.height_m, diag = Math.hypot(W, H);
+
+  camera = new THREE.PerspectiveCamera(55, renderer.domElement.clientWidth / renderer.domElement.clientHeight, 0.5, diag * 8);
+  initialCamPos = new THREE.Vector3(W * 0.12, meta.max_elev_m * 3.2 + diag * 0.38, H * 1.05 + diag * 0.15);
+  initialTarget = new THREE.Vector3(0, meta.max_elev_m * 0.4, 0);
+  camera.position.copy(initialCamPos);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = diag * 0.04;
+  controls.maxDistance = diag * 3.2;
+  controls.target.copy(initialTarget);
+
+  sky = new Sky();
+  sky.scale.setScalar(diag * 12);
+  scene.add(sky);
+  const su = sky.material.uniforms;
+  su.turbidity.value = 4;
+  su.rayleigh.value = 1.8;
+  su.mieCoefficient.value = 0.005;
+  su.mieDirectionalG.value = 0.8;
+
+  sun = new THREE.DirectionalLight(0xfff3e0, 2.4);
+  sun.castShadow = true;
+  const sc = sun.shadow.camera, ext = diag * 0.6;
+  sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext;
+  sc.near = 0.5; sc.far = diag * 5;
+  sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
+  sun.shadow.bias = -0.0006;
+  scene.add(sun); scene.add(sun.target);
+
+  hemiLight = new THREE.HemisphereLight(0xbfd4ff, 0x4a4234, 0.55);
+  scene.add(hemiLight);
+  ambLight = new THREE.AmbientLight(0xffffff, 0.12);
+  scene.add(ambLight);
+
+  const fogCol = 0xc8d6e8;
+  scene.fog = new THREE.Fog(fogCol, diag * 1.1, diag * 3.6);
+
+  terrainMaterial = new THREE.MeshStandardMaterial({ map: albedo, roughness: 0.92, metalness: 0 });
+  if (normalTex) {
+    normalTex.colorSpace = THREE.NoColorSpace;
+    terrainMaterial.normalMap = normalTex;
+    terrainMaterial.normalScale = new THREE.Vector2(1.1, 1.1);
+  }
+
+  pinGroup = new THREE.Group();
+  scene.add(pinGroup);
+
+  applyTimeOfDay(12);
+  applyWeather('sunny');
+}
+
+function buildTerrain(detail) {
+  if (terrain) { scene.remove(terrain); geometry.dispose(); }
+  const W = meta.width_m, H = meta.height_m;
+  const aspect = heightData.width / heightData.height;
+  const segX = Math.min(detail, heightData.width - 1);
+  const segY = Math.max(8, Math.min(Math.round(detail / aspect), heightData.height - 1));
+  geometry = new THREE.PlaneGeometry(W, H, segX, segY);
+  const pos = geometry.attributes.position;
+  baseHeights = new Float32Array(pos.count);
+  const minE = meta.min_elev_m, maxE = meta.max_elev_m;
+  for (let i = 0; i < pos.count; i++) {
+    const u = (pos.getX(i) + W / 2) / W;
+    const v = 1 - (pos.getY(i) + H / 2) / H;
+    baseHeights[i] = minE + sampleBilinear(heightData, u, v) * (maxE - minE);
+  }
+  terrain = new THREE.Mesh(geometry, terrainMaterial);
+  terrain.rotation.x = -Math.PI / 2;
+  terrain.castShadow = terrain.receiveShadow = true;
+  scene.add(terrain);
+  applyDisplacement();
+}
+
+function applyDisplacement() {
+  const pos = geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, baseHeights[i] * exag);
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+function terrainElevationAt(u, v) {
+  const n = sampleBilinear(heightData, u, v);
+  return (meta.min_elev_m + n * (meta.max_elev_m - meta.min_elev_m)) * exag;
+}
+
+function worldToUV(wx, wz) {
+  const W = meta.width_m, H = meta.height_m;
+  return { u: (wx / W) + 0.5, v: (wz / H) + 0.5 };
+}
+
+function uvToLatLon(u, v) {
+  if (!meta.georef) return null;
+  const lat0 = meta.georef.origin_lat, lon0 = meta.georef.origin_lon;
+  const mPerDegLat = 111320;
+  const mPerDegLon = 111320 * Math.cos(lat0 * Math.PI / 180);
+  return {
+    lat: lat0 - v * meta.height_m / mPerDegLat,
+    lon: lon0 + u * meta.width_m / mPerDegLon,
+  };
+}
+
+function buildBuildings() {
+  if (buildingMesh) { buildingsGroup.remove(buildingMesh); buildingGeo.dispose(); buildingMesh = null; }
+  const list = buildingData?.buildings || [];
+  if (!list.length) return;
+  if (!buildingsGroup) { buildingsGroup = new THREE.Group(); scene.add(buildingsGroup); }
+  buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xb8b2a6, roughness: 0.82, metalness: 0.04 });
+  buildingMesh = new THREE.InstancedMesh(buildingGeo, mat, list.length);
+  buildingMesh.castShadow = buildingMesh.receiveShadow = true;
+  buildingMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3), 3);
+  buildingsGroup.add(buildingMesh);
+  baseBuildingColors.length = 0;
+  positionBuildings();
+}
+
+function positionBuildings() {
+  if (!buildingMesh) return;
+  const W = meta.width_m, H = meta.height_m, list = buildingData.buildings;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    const wx = (b.u - 0.5) * W, wz = (b.v - 0.5) * H;
+    const baseY = terrainElevationAt(b.u, b.v);
+    const hgt = b.height_m * exag;
+    p.set(wx, baseY + hgt / 2, wz);
+    s.set(Math.max(1.5, b.su * W), hgt, Math.max(1.5, b.sv * H));
+    m.compose(p, q, s);
+    buildingMesh.setMatrixAt(i, m);
+    const t = 0.78 + 0.18 * (b.density || 0.4);
+    col.setRGB(t, t * 0.97, t * 0.9);
+    buildingMesh.setColorAt(i, col);
+    baseBuildingColors[i] = col.clone();
+  }
+  buildingMesh.instanceMatrix.needsUpdate = true;
+  if (buildingMesh.instanceColor) buildingMesh.instanceColor.needsUpdate = true;
+}
+
+function buildWater() {
+  if (water) { scene.remove(water); water.geometry.dispose(); water = null; }
+  if (!meta.has_water) return;
+  const W = meta.width_m, H = meta.height_m;
+  waterMat = new THREE.MeshStandardMaterial({
+    color: 0x2f6f7e, roughness: 0.12, transparent: true, opacity: 0.62,
+  });
+  water = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 64, 24), waterMat);
+  water.rotation.x = -Math.PI / 2;
+  water.receiveShadow = true;
+  water.position.y = (meta.water_level_m || 0) * exag;
+  scene.add(water);
+}
+
+function buildRain() {
+  const count = 800;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const W = meta.width_m, H = meta.height_m, diag = Math.hypot(W, H);
+  for (let i = 0; i < count; i++) {
+    pos[i*3] = (Math.random() - 0.5) * W * 1.2;
+    pos[i*3+1] = Math.random() * diag * 0.5 + 10;
+    pos[i*3+2] = (Math.random() - 0.5) * H * 1.2;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  rainSystem = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xaaccff, size: 1.2, transparent: true, opacity: 0.5, depthWrite: false,
+  }));
+  rainSystem.visible = false;
+  scene.add(rainSystem);
+}
+
+function buildPins() {
+  pinGroup.clear();
+  const W = meta.width_m, H = meta.height_m;
+  for (const pin of pins) {
+    const wx = (pin.u - 0.5) * W, wz = (pin.v - 0.5) * H;
+    const y = terrainElevationAt(pin.u, pin.v) + 2;
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.15, 3, 6),
+      new THREE.MeshStandardMaterial({ color: 0xff4444 })
+    );
+    pole.position.y = 1.5;
+    g.add(pole);
+    g.position.set(wx, y, wz);
+    g.userData.pin = pin;
+    pinGroup.add(g);
+  }
+}
+
+function savePins() {
+  sessionStorage.setItem(PINS_KEY, JSON.stringify(pins));
+}
+
+// --- Sun / weather / season ---
+function applyTimeOfDay(hour) {
+  const az = ((hour / 24) * 360 + 90) % 360;
+  const el = hour < 6 || hour > 20 ? 5 : 15 + 55 * Math.sin((hour - 6) / 12 * Math.PI);
+  updateSun(az, el);
+  $('tod-val').textContent = `${String(Math.floor(hour)).padStart(2,'0')}:${String(Math.round((hour%1)*60)).padStart(2,'0')}`;
+}
+
+function updateSun(azDeg, elDeg) {
+  const az = THREE.MathUtils.degToRad(azDeg);
+  const el = THREE.MathUtils.degToRad(elDeg);
+  const r = Math.hypot(meta.width_m, meta.height_m);
+  const dir = new THREE.Vector3(Math.cos(el)*Math.cos(az), Math.sin(el), Math.cos(el)*Math.sin(az));
+  sun.position.copy(dir.clone().multiplyScalar(r));
+  sun.target.position.set(0, 0, 0);
+  if (sky) sky.material.uniforms.sunPosition.value.copy(dir);
+  const t = Math.max(0, Math.sin(el));
+  sun.intensity = 0.4 + 2.6 * t;
+  hemiLight.intensity = 0.3 + 0.35 * t;
+  ambLight.intensity = 0.06 + 0.12 * t;
+}
+
+const WEATHER = {
+  sunny:  { turbidity: 2,  fogNear: 1.1, fogFar: 3.8, exp: 1.05, rain: false },
+  cloudy: { turbidity: 10, fogNear: 0.7, fogFar: 2.2, exp: 0.85, rain: false },
+  rainy:  { turbidity: 10, fogNear: 0.5, fogFar: 1.6, exp: 0.7,  rain: true  },
+};
+function applyWeather(name) {
+  const w = WEATHER[name] || WEATHER.sunny;
+  const diag = Math.hypot(meta.width_m, meta.height_m);
+  sky.material.uniforms.turbidity.value = w.turbidity;
+  if ($('fogchk').checked)
+    scene.fog = new THREE.Fog(0x9aabb8, diag * w.fogNear, diag * w.fogFar);
+  renderer.toneMappingExposure = w.exp;
+  if (rainSystem) rainSystem.visible = w.rain;
+}
+
+const SEASON_TINT = {
+  none: null, spring: 0x88ff88, summer: 0xffffaa, autumn: 0xffaa66, winter: 0xaaccff,
+};
+function applySeason(name) {
+  if (seasonTint) { scene.remove(seasonTint); seasonTint.geometry.dispose(); seasonTint.material.dispose(); seasonTint = null; }
+  const col = SEASON_TINT[name];
+  if (!col) return;
+  const W = meta.width_m, H = meta.height_m;
+  seasonTint = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.08, depthWrite: false })
+  );
+  seasonTint.rotation.x = -Math.PI / 2;
+  seasonTint.position.y = 0.5;
+  seasonTint.renderOrder = 2;
+  scene.add(seasonTint);
+}
+
+// --- Telemetry ---
+function initSimTelemetry() {
+  const list = buildingData?.buildings || [];
+  const buildings = [];
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    buildings.push({
+      id: b.id || `B-${String(i+1).padStart(3,'0')}`,
+      occupancy_pct: 40 + Math.random() * 40,
+      energy_kwh: 15 + Math.random() * 25,
+      status: Math.random() > 0.9 ? 'warning' : 'normal',
+      maintenance: b.last_maintenance || (i % 17 === 0 ? 'planlı' : 'normal'),
+    });
+  }
+  simTelemetry = {
+    environment: {
+      temperature_c: 22, humidity_pct: 58, wind_speed_ms: 6, solar_irradiance_wm2: 650,
+      water_level_m: meta.water_level_m || 0,
+    },
+    buildings,
+  };
+}
+
+function initSimAlarms() {
+  const wl = simTelemetry?.environment?.water_level_m || meta.water_level_m || 0;
+  const alarms = [];
+  if (wl > 13) alarms.push({ level: 'warning', message: `Su seviyesi: ${wl.toFixed(2)} m`, category: 'su' });
+  for (const b of simTelemetry?.buildings || []) {
+    if (b.energy_kwh > 40) alarms.push({ level: 'warning', message: `${b.id} enerji: ${b.energy_kwh.toFixed(0)} kWh`, category: 'enerji' });
+  }
+  alarmsData = { overall: alarms.length ? 'warning' : 'ok', count: alarms.length, alarms };
+}
+
+function initSimAssets() {
+  const list = buildingData?.buildings || [];
+  assetsRegistry = {
+    count: list.length,
+    assets: list.map((b, i) => ({
+      id: b.id || `B-${String(i+1).padStart(3,'0')}`,
+      type: b.type || 'konut',
+      capacity: b.capacity || 50,
+      last_maintenance: b.last_maintenance || '2025-01-01',
+      height_m: b.height_m,
+    })),
+  };
+}
+
+function initTelemetry() {
+  initSimTelemetry();
+  fetchTelemetry();
+  fetchAssets();
+  fetchAlarms();
+  setInterval(() => { fetchTelemetry(); fetchAlarms(); }, 2500);
+}
+
+async function fetchTelemetry() {
+  try {
+    const r = await fetch(API_URL, { signal: AbortSignal.timeout(1500) });
+    if (r.ok) {
+      telemetry = await r.json();
+      telemetrySource = 'API';
+      $('sb-api').textContent = 'Telemetri: API ✓';
+      return;
+    }
+  } catch (_) {}
+  if (!simTelemetry) initSimTelemetry();
+  // drift simulation
+  const t = clock.getElapsedTime();
+  simTelemetry.environment.temperature_c = 20 + 6*Math.sin(t*0.05) + Math.sin(t*0.2)*0.5;
+  simTelemetry.environment.humidity_pct = 55 + 15*Math.cos(t*0.04);
+  simTelemetry.environment.wind_speed_ms = 5 + 4*Math.abs(Math.sin(t*0.07));
+  simTelemetry.environment.solar_irradiance_wm2 = Math.max(0, 800*Math.sin(t*0.03+1));
+  simTelemetry.environment.water_level_m = (meta.water_level_m||0) + Math.sin(t*0.08)*0.07;
+  for (const b of simTelemetry.buildings) {
+    b.occupancy_pct = Math.max(0, Math.min(100, b.occupancy_pct + (Math.random()-0.5)*2));
+    b.energy_kwh = Math.max(5, b.energy_kwh + (Math.random()-0.5)*1.5);
+    b.status = b.occupancy_pct > 88 ? 'warning' : 'normal';
+  }
+  telemetry = simTelemetry;
+  telemetrySource = 'simülasyon';
+  $('sb-api').textContent = 'Telemetri: simülasyon';
+}
+
+async function fetchAssets() {
+  try {
+    const r = await fetch(API_ASSETS, { signal: AbortSignal.timeout(1500) });
+    if (r.ok) { assetsRegistry = await r.json(); return; }
+  } catch (_) {}
+  if (!assetsRegistry) initSimAssets();
+}
+
+async function fetchAlarms() {
+  try {
+    const r = await fetch(API_ALARMS, { signal: AbortSignal.timeout(1500) });
+    if (r.ok) { alarmsData = await r.json(); return; }
+  } catch (_) {}
+  initSimAlarms();
+}
+
+function updateAlarmsUI() {
+  if (!alarmsData) return;
+  const badge = $('alarm-badge');
+  const overall = alarmsData.overall || 'ok';
+  badge.className = 'badge ' + (overall === 'critical' ? 'err' : overall === 'warning' ? 'warn' : 'ok');
+  badge.textContent = overall === 'critical' ? 'Kritik' : overall === 'warning' ? 'Uyarı' : 'Normal';
+  const list = $('alarm-list');
+  const show = (alarmsData.alarms || []).slice(0, 6);
+  if (!show.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:11px">Aktif alarm yok</div>';
+    return;
+  }
+  list.innerHTML = show.map(a =>
+    `<div class="alm"><span class="badge ${a.level==='critical'?'err':a.level==='warning'?'warn':'ok'}">${a.category||'—'}</span> ${a.message}</div>`
+  ).join('');
+}
+
+function getAssetForBuilding(idx) {
+  const b = buildingData?.buildings?.[idx];
+  const id = b?.id || `B-${String(idx+1).padStart(3,'0')}`;
+  return assetsRegistry?.assets?.find(a => a.id === id) || b || {};
+}
+
+function updateTelemetryUI() {
+  if (!telemetry) return;
+  const e = telemetry.environment;
+  smoothDisplay('tel-temp', e.temperature_c, 1);
+  smoothDisplay('tel-hum', e.humidity_pct, 0);
+  smoothDisplay('tel-wind', e.wind_speed_ms, 1);
+  smoothDisplay('tel-solar', e.solar_irradiance_wm2, 0);
+  smoothDisplay('ov-water', e.water_level_m, 2);
+  if (water) water.position.y = e.water_level_m * exag;
+
+  const warns = telemetry.buildings.filter(b => b.status === 'warning').length;
+  const badge = $('sys-badge');
+  if (warns === 0) { badge.className = 'badge ok'; badge.textContent = 'Normal'; }
+  else if (warns < 4) { badge.className = 'badge warn'; badge.textContent = `${warns} uyarı`; }
+  else { badge.className = 'badge err'; badge.textContent = `${warns} kritik`; }
+
+  const list = $('building-list');
+  const show = telemetry.buildings.slice(0, 12);
+  list.innerHTML = show.map(b =>
+    `<div class="row" data-bid="${b.id}"><span>${b.id}</span><span>${b.occupancy_pct.toFixed(0)}% · ${b.energy_kwh.toFixed(0)} kWh <span class="badge ${b.status==='warning'?'warn':'ok'}">${b.status==='warning'?'⚠':'✓'}</span></span></div>`
+  ).join('');
+  list.querySelectorAll('.row').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = parseInt(row.dataset.bid.split('-')[1], 10) - 1;
+      focusBuilding(idx);
+    });
+  });
+}
+
+function getBuildingTelemetry(idx) {
+  return telemetry?.buildings?.[idx] || {
+    id: `B-${String(idx+1).padStart(3,'0')}`, occupancy_pct: 0, energy_kwh: 0, status: 'normal', maintenance: 'normal',
+  };
+}
+
+// --- Overview UI ---
+function updateOverviewUI() {
+  const name = meta.site_name || (meta.synthetic ? 'Sentetik Saha' : 'Gerçek Drone Sahası');
+  $('site-name').textContent = name;
+  $('site-sub').textContent = `Twin v${meta.twin_version || '1.0'} · ${meta.synthetic ? 'Sentetik' : 'Gerçek'} veri`;
+  $('ov-size').textContent = `${meta.width_m}×${meta.height_m} m`;
+  $('ov-elev').textContent = `${meta.min_elev_m.toFixed(0)}–${meta.max_elev_m.toFixed(0)} m`;
+  $('ov-buildings').textContent = meta.asset_summary?.building_count ?? (buildingData?.buildings?.length ?? 0);
+  $('ov-water').innerHTML = `${(meta.water_level_m||0).toFixed(1)}<span class="u"> m</span>`;
+  $('ov-dataset').textContent = meta.synthetic ? 'Sentetik DSM' : 'Gerçek ortho+DSM';
+  $('ov-updated').textContent = meta.last_updated ? new Date(meta.last_updated).toLocaleString('tr-TR') : '—';
+}
+
+// --- Interaction ---
+function setBuildingHighlight(idx, on) {
+  if (!buildingMesh || idx < 0) return;
+  const col = on ? new THREE.Color(0x4da3ff) : baseBuildingColors[idx];
+  if (col) { buildingMesh.setColorAt(idx, col); buildingMesh.instanceColor.needsUpdate = true; }
+}
+
+function onPointerMove(ev) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  if (buildingMesh && buildingsGroup?.visible) {
+    const hits = raycaster.intersectObject(buildingMesh);
+    const newH = hits.length ? hits[0].instanceId : -1;
+    if (newH !== hoveredBuilding) {
+      if (hoveredBuilding >= 0) setBuildingHighlight(hoveredBuilding, false);
+      hoveredBuilding = newH;
+      if (hoveredBuilding >= 0) setBuildingHighlight(hoveredBuilding, true);
+    }
+  }
+  // status coords on hover terrain
+  const th = raycaster.intersectObject(terrain);
+  if (th.length) {
+    const p = th[0].point;
+    const { u, v } = worldToUV(p.x, p.z);
+    const elev = terrainElevationAt(u, v) / exag;
+    $('sb-coords').textContent = `X:${p.x.toFixed(1)} Z:${p.z.toFixed(1)} Y:${elev.toFixed(1)}m`;
+  }
+}
+
+function onClick(ev) {
+  if (ev.target.closest('.panel') || ev.target.closest('#statusbar')) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const terrainHit = raycaster.intersectObject(terrain)[0];
+  if (!terrainHit) return;
+  const p = terrainHit.point;
+  const { u, v } = worldToUV(p.x, p.z);
+
+  if (activeTool === 'measure') {
+    measurePoints.push(p.clone());
+    addMeasureMarker(p);
+    if (measurePoints.length >= 2) finishMeasure();
+    return;
+  }
+  if (activeTool === 'area') {
+    areaPoints.push(p.clone());
+    addMeasureMarker(p);
+    updateAreaPreview();
+    if (areaPoints.length >= 3 && ev.detail === 2) finishArea();
+    return;
+  }
+  if (activeTool === 'pin') {
+    const label = prompt('Pin etiketi:', `Pin ${pins.length + 1}`);
+    if (label === null) return;
+    pins.push({ u, v, label, note: '', t: Date.now() });
+    savePins(); buildPins();
+    return;
+  }
+  if (activeTool === 'profile') {
+    profilePoints.push(p.clone());
+    addMeasureMarker(p);
+    if (profilePoints.length >= 2) finishProfile();
+    return;
+  }
+
+  const bHit = buildingMesh ? raycaster.intersectObject(buildingMesh)[0] : null;
+  if (bHit) showBuildingInspect(bHit.instanceId);
+  else showTerrainInspect(p, u, v);
+}
+
+function showBuildingInspect(idx) {
+  const b = buildingData.buildings[idx];
+  const tel = getBuildingTelemetry(idx);
+  const asset = getAssetForBuilding(idx);
+  const W = meta.width_m, H = meta.height_m;
+  $('inspect-title').textContent = tel.id;
+  $('inspect-body').innerHTML = `
+    <dt>Tip</dt><dd>${asset.type || '—'}</dd>
+    <dt>Kapasite</dt><dd>${asset.capacity ?? '—'} kişi</dd>
+    <dt>Footprint</dt><dd>${(b.su*W).toFixed(1)} × ${(b.sv*H).toFixed(1)} m</dd>
+    <dt>Yükseklik</dt><dd>${b.height_m.toFixed(1)} m</dd>
+    <dt>Doluluk</dt><dd>${tel.occupancy_pct.toFixed(1)} %</dd>
+    <dt>Enerji</dt><dd>${tel.energy_kwh.toFixed(1)} kWh</dd>
+    <dt>Durum</dt><dd><span class="badge ${tel.status==='warning'?'warn':'ok'}">${tel.status==='warning'?'Uyarı':'Normal'}</span></dd>
+    <dt>Son bakım</dt><dd>${asset.last_maintenance || tel.maintenance || '—'}</dd>
+  `;
+  $('inspect').classList.add('visible');
+}
+
+function showTerrainInspect(p, u, v) {
+  const elev = terrainElevationAt(u, v) / exag;
+  const ll = uvToLatLon(u, v);
+  $('inspect-title').textContent = 'Arazi noktası';
+  let html = `
+    <dt>Koordinat X/Z</dt><dd>${p.x.toFixed(2)} / ${p.z.toFixed(2)} m</dd>
+    <dt>Yükseklik</dt><dd>${elev.toFixed(2)} m</dd>
+    <dt>UV</dt><dd>${u.toFixed(4)}, ${v.toFixed(4)}</dd>`;
+  if (ll) html += `<dt>Lat/Lon</dt><dd>${ll.lat.toFixed(6)}, ${ll.lon.toFixed(6)}</dd>`;
+  $('inspect-body').innerHTML = html;
+  $('inspect').classList.add('visible');
+}
+
+function focusBuilding(idx) {
+  if (!buildingData?.buildings?.[idx]) return;
+  const b = buildingData.buildings[idx];
+  const W = meta.width_m, H = meta.height_m;
+  const wx = (b.u - 0.5) * W, wz = (b.v - 0.5) * H;
+  const y = terrainElevationAt(b.u, b.v) + b.height_m * exag * 1.5;
+  camera.position.lerp(new THREE.Vector3(wx + 15, y + 10, wz + 15), 0.3);
+  controls.target.set(wx, terrainElevationAt(b.u, b.v), wz);
+  showBuildingInspect(idx);
+}
+
+// --- Measurement ---
+function addMeasureMarker(p) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(0.6, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffcc00 })
+  );
+  m.position.copy(p);
+  scene.add(m);
+  measureMarkers.push(m);
+}
+
+function clearMeasure() {
+  measurePoints = []; areaPoints = []; profilePoints = [];
+  measureMarkers.forEach(m => { scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  measureMarkers = [];
+  if (measureLine) { scene.remove(measureLine); measureLine.geometry.dispose(); measureLine.material.dispose(); measureLine = null; }
+  if (profileLine) { scene.remove(profileLine); profileLine.geometry.dispose(); profileLine.material.dispose(); profileLine = null; }
+  if (areaMesh) { scene.remove(areaMesh); areaMesh.geometry.dispose(); areaMesh.material.dispose(); areaMesh = null; }
+  $('measure-label').style.display = 'none';
+  $('profile-panel').classList.remove('visible');
+}
+
+function finishMeasure() {
+  const [a, b] = measurePoints.slice(-2);
+  const dist = a.distanceTo(b);
+  if (measureLine) scene.remove(measureLine);
+  measureLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([a, b]),
+    new THREE.LineBasicMaterial({ color: 0xffcc00, linewidth: 2 })
+  );
+  scene.add(measureLine);
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  const lbl = $('measure-label');
+  lbl.textContent = `${dist.toFixed(2)} m`;
+  lbl.style.display = 'block';
+  updateMeasureLabelPos(mid);
+  measurePoints = [];
+}
+
+function updateAreaPreview() {
+  if (areaPoints.length < 2) return;
+  const pts = [...areaPoints, areaPoints[0]];
+  if (areaMesh) scene.remove(areaMesh);
+  const shape = new THREE.Shape();
+  shape.moveTo(areaPoints[0].x, areaPoints[0].z);
+  for (let i = 1; i < areaPoints.length; i++) shape.lineTo(areaPoints[i].x, areaPoints[i].z);
+  const geo = new THREE.ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+  areaMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.25, side: THREE.DoubleSide }));
+  areaMesh.position.y = areaPoints[0].y + 0.3;
+  scene.add(areaMesh);
+}
+
+function finishArea() {
+  if (areaPoints.length < 3) return;
+  let area = 0;
+  for (let i = 0; i < areaPoints.length; i++) {
+    const j = (i + 1) % areaPoints.length;
+    area += areaPoints[i].x * areaPoints[j].z - areaPoints[j].x * areaPoints[i].z;
+  }
+  area = Math.abs(area) / 2;
+  $('measure-label').textContent = `Alan: ${area.toFixed(1)} m² (${areaPoints.length} köşe)`;
+  $('measure-label').style.display = 'block';
+  areaPoints = [];
+}
+
+function updateMeasureLabelPos(worldPos) {
+  const v = worldPos.clone().project(camera);
+  const rect = renderer.domElement.getBoundingClientRect();
+  const lbl = $('measure-label');
+  lbl.style.left = ((v.x + 1) / 2 * rect.width + rect.left) + 'px';
+  lbl.style.top = ((-v.y + 1) / 2 * rect.height + rect.top - 20) + 'px';
+}
+
+// --- Height profile ---
+function sampleProfileElevations(a, b, samples = 64) {
+  const W = meta.width_m, H = meta.height_m;
+  const elevs = [], dists = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+    const u = x / W + 0.5, v = z / H + 0.5;
+    elevs.push(terrainElevationAt(u, v) / exag);
+    dists.push(Math.hypot(b.x - a.x, b.z - a.z) * t);
+  }
+  return { elevs, dists, totalDist: Math.hypot(b.x - a.x, b.z - a.z) };
+}
+
+function drawProfileChart(elevs, dists) {
+  const cvs = $('profile-canvas');
+  const ctx = cvs.getContext('2d');
+  const cw = cvs.width, ch = cvs.height;
+  ctx.clearRect(0, 0, cw, ch);
+  const minE = Math.min(...elevs), maxE = Math.max(...elevs);
+  const pad = 12;
+  const range = Math.max(0.5, maxE - minE);
+  ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad, ch - pad); ctx.lineTo(cw - pad, ch - pad); ctx.stroke();
+  ctx.strokeStyle = '#4da3ff'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < elevs.length; i++) {
+    const x = pad + (dists[i] / dists[dists.length - 1]) * (cw - pad * 2);
+    const y = ch - pad - ((elevs[i] - minE) / range) * (ch - pad * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(77,163,255,.15)';
+  ctx.lineTo(cw - pad, ch - pad); ctx.lineTo(pad, ch - pad); ctx.closePath(); ctx.fill();
+}
+
+function finishProfile() {
+  const [a, b] = profilePoints.slice(-2);
+  if (profileLine) scene.remove(profileLine);
+  profileLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([a, b]),
+    new THREE.LineBasicMaterial({ color: 0x44ffaa, linewidth: 2 })
+  );
+  scene.add(profileLine);
+  const { elevs, dists, totalDist } = sampleProfileElevations(a, b);
+  drawProfileChart(elevs, dists);
+  const gain = Math.max(...elevs) - Math.min(...elevs);
+  $('profile-stats').textContent = `Mesafe: ${totalDist.toFixed(1)} m · Δh: ${gain.toFixed(2)} m · Min: ${Math.min(...elevs).toFixed(2)} m · Max: ${Math.max(...elevs).toFixed(2)} m`;
+  $('profile-panel').classList.add('visible');
+  profilePoints = [];
+}
+
+// --- Time axis (before/after) ---
+function applyTimeAxis(val) {
+  const t = val / 100;
+  const year = t < 0.5 ? '2024' : '2026';
+  $('time-val').textContent = year;
+  if (!compareOverlay) return;
+  if (DATA_DIR === 'data_real') {
+    compareOverlay.style.background = t < 0.5 ? 'rgba(180,140,80,0.25)' : 'rgba(80,140,200,0.08)';
+    compareOverlay.style.opacity = t < 0.5 ? String(0.3 + (0.5 - t) * 0.4) : String(0.05);
+  } else {
+    compareOverlay.style.background = 'rgba(100,180,255,0.15)';
+    compareOverlay.style.opacity = String(Math.abs(t - 0.5) * 0.6);
+  }
+  terrainMaterial.opacity = 0.85 + t * 0.15;
+  terrainMaterial.transparent = t < 0.95;
+}
+
+// --- Demo camera tour ---
+function startDemoTour() {
+  demoActive = true;
+  demoStep = 0;
+  demoT = 0;
+  applyPreset('bird');
+}
+
+function updateDemoTour(dt) {
+  if (!demoActive) return;
+  demoT += dt;
+  const W = meta.width_m, H = meta.height_m, diag = Math.hypot(W, H);
+  const n = buildingData?.buildings?.length || 0;
+  if (demoStep === 0 && demoT > 3) { demoStep = 1; demoT = 0; }
+  else if (demoStep === 1 && demoT > 2 && n > 0) {
+    focusBuilding(Math.min(demoStep - 1, n - 1));
+    demoStep++; demoT = 0;
+  } else if (demoStep > 1 && demoStep <= Math.min(n, 4) && demoT > 2.5) {
+    focusBuilding(demoStep - 1);
+    demoStep++; demoT = 0;
+  } else if (demoStep > Math.min(n, 4) && demoT > 2) {
+    demoStep = 99; demoT = 0;
+    if (water) {
+      controls.target.set(0, water.position.y, 0);
+      camera.position.set(0, water.position.y + diag * 0.3, diag * 0.4);
+    }
+  } else if (demoStep === 99 && demoT > 4) {
+    demoActive = false;
+    camera.position.copy(initialCamPos);
+    controls.target.copy(initialTarget);
+  }
+}
+
+// --- Mini-map ---
+function drawMinimap() {
+  const cvs = $('minimap-canvas');
+  const ctx = cvs.getContext('2d');
+  const cw = cvs.width, ch = cvs.height;
+  ctx.clearRect(0, 0, cw, ch);
+  if (orthoThumb) {
+    ctx.drawImage(orthoThumb, 0, 0, cw, ch);
+  } else {
+    ctx.fillStyle = '#333'; ctx.fillRect(0, 0, cw, ch);
+  }
+  const W = meta.width_m, H = meta.height_m;
+  const t = controls.target;
+  const tx = ((t.x / W) + 0.5) * cw;
+  const tz = ((t.z / H) + 0.5) * ch;
+  const camDist = camera.position.distanceTo(t);
+  const vw = Math.min(cw, (camDist / (W * 0.5)) * cw * 0.4);
+  const vh = Math.min(ch, (camDist / (H * 0.5)) * ch * 0.4);
+  ctx.strokeStyle = '#4da3ff'; ctx.lineWidth = 2;
+  ctx.strokeRect(tx - vw/2, tz - vh/2, vw, vh);
+  ctx.fillStyle = '#4da3ff'; ctx.beginPath(); ctx.arc(tx, tz, 3, 0, Math.PI*2); ctx.fill();
+}
+
+$('minimap-canvas').addEventListener('click', ev => {
+  const cvs = $('minimap-canvas');
+  const rect = cvs.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) / rect.width;
+  const y = (ev.clientY - rect.top) / rect.height;
+  const W = meta.width_m, H = meta.height_m;
+  controls.target.set((x - 0.5) * W, controls.target.y, (y - 0.5) * H);
+});
+
+// --- Camera presets ---
+function applyPreset(name) {
+  const W = meta.width_m, H = meta.height_m, diag = Math.hypot(W, H);
+  const presets = {
+    bird:  { pos: [0, diag * 0.9, 0.01], target: [0, 0, 0] },
+    north: { pos: [0, meta.max_elev_m * 2, -diag * 0.7], target: [0, 0, 0] },
+    south: { pos: [0, meta.max_elev_m * 2, diag * 0.7], target: [0, 0, 0] },
+    close: { pos: null, target: null },
+  };
+  const p = presets[name];
+  if (!p) return;
+  if (name === 'close' && buildingData?.buildings?.length) {
+    focusBuilding(0); return;
+  }
+  camera.position.set(...p.pos);
+  controls.target.set(...p.target);
+  controls.update();
+}
+
+// --- Screenshot ---
+function exportScreenshot() {
+  renderer.render(scene, camera);
+  const a = document.createElement('a');
+  a.download = `dijital-ikiz-${Date.now()}.png`;
+  a.href = renderer.domElement.toDataURL('image/png');
+  a.click();
+}
+
+// --- Perf ---
+function applyPerf(name) {
+  const p = PERF[name] || PERF.balanced;
+  currentDetail = p.detail;
+  shadowMapSize = p.shadow;
+  if (sun) sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, p.pixelRatio));
+  if (p.ssao) setSSAO(true); else setSSAO(false);
+  buildTerrain(currentDetail);
+  positionBuildings();
+}
+
+function setSSAO(on) {
+  if (on && !composer) {
+    try {
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      ssaoPass = new SSAOPass(scene, camera, renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+      composer.addPass(ssaoPass);
+      composer.addPass(new OutputPass());
+    } catch (_) { composer = null; }
+  }
+  useSSAO = on && !!composer;
+}
+
+// --- Wire UI ---
+function wireUI() {
+  $('dataset').value = DATA_DIR === 'data' ? 'data' : 'data_real';
+  $('dataset').addEventListener('change', () => {
+    const p = new URLSearchParams(location.search);
+    p.set('data', $('dataset').value);
+    location.search = p.toString();
+  });
+  $('perf').addEventListener('change', () => applyPerf($('perf').value));
+  $('tod').addEventListener('input', () => applyTimeOfDay(+$('tod').value));
+  $('weather').addEventListener('change', () => applyWeather($('weather').value));
+  $('season').addEventListener('change', () => applySeason($('season').value));
+  $('preset-view').addEventListener('change', () => { applyPreset($('preset-view').value); $('preset-view').value = ''; });
+  $('btn-screenshot').addEventListener('click', exportScreenshot);
+  $('btn-demo').addEventListener('click', startDemoTour);
+  $('btn-reset').addEventListener('click', () => { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); });
+  $('inspect-close').addEventListener('click', () => $('inspect').classList.remove('visible'));
+  $('profile-close').addEventListener('click', () => { $('profile-panel').classList.remove('visible'); clearMeasure(); activeTool = 'inspect'; });
+  $('time-axis').addEventListener('input', () => applyTimeAxis(+$('time-axis').value));
+  applyTimeAxis(100);
+  $('buildingschk').addEventListener('change', e => { if (buildingsGroup) buildingsGroup.visible = e.target.checked; });
+  $('waterchk').addEventListener('change', e => { if (water) water.visible = e.target.checked; });
+  $('fogchk').addEventListener('change', () => applyWeather($('weather').value));
+
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeTool = btn.dataset.tool;
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === activeTool));
+      $('sb-tool').textContent = 'Araç: ' + btn.textContent;
+      clearMeasure();
+      renderer.domElement.classList.toggle('crosshair-cursor', activeTool !== 'inspect');
+    });
+  });
+  $('tool-inspect').classList.add('active');
+
+  $('panel-toggle').addEventListener('click', () => $('sidebar').classList.toggle('collapsed'));
+
+  renderer.domElement.addEventListener('pointermove', onPointerMove);
+  renderer.domElement.addEventListener('click', onClick);
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  const h = window.innerHeight - 34;
+  camera.aspect = window.innerWidth / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, h);
+  if (composer) composer.setSize(window.innerWidth, h);
+}
+
+// --- Animate ---
+let frames = 0, fpsT = 0, lastT = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  frames++; fpsT += now - lastT; lastT = now;
+  if (fpsT >= 500) {
+    $('sb-fps').textContent = Math.round(1000 * frames / fpsT);
+    frames = 0; fpsT = 0;
+    updateTelemetryUI();
+    updateAlarmsUI();
+  }
+  controls.update();
+  updateDemoTour(clock.getDelta());
+  if (water) {
+    const pos = water.geometry.attributes.position;
+    const t = clock.getElapsedTime();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      pos.setZ(i, Math.sin(x*0.06+t)*0.15 + Math.cos(y*0.08+t*0.9)*0.15);
+    }
+    pos.needsUpdate = true;
+  }
+  if (rainSystem?.visible) {
+    const pos = rainSystem.geometry.attributes.position;
+    const arr = pos.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i+1] -= 0.8;
+      if (arr[i+1] < 0) arr[i+1] = 40 + Math.random() * 20;
+    }
+    pos.needsUpdate = true;
+  }
+  drawMinimap();
+  if (useSSAO && composer) composer.render();
+  else renderer.render(scene, camera);
+}
+
+init().catch(err => {
+  console.error(err);
+  loadMsg.textContent = 'HATA: ' + err.message + ' — python serve.py ile açın';
+});
+</script>
+</body>
+</html>

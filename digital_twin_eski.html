@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>3D Digital Twin — DJI Drone Survey</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#070b14;font-family:'Segoe UI',sans-serif;overflow:hidden;}
+#wrap{width:100vw;height:100vh;position:absolute;top:0;left:0;}
+canvas{display:block;position:absolute;top:0;left:0;z-index:1;width:100vw;height:100vh;}
+#hud{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;}
+#titlebar{position:absolute;top:18px;left:50%;transform:translateX(-50%);
+  background:rgba(5,10,25,0.88);border:1px solid rgba(0,210,255,0.35);
+  border-radius:14px;padding:12px 32px;backdrop-filter:blur(14px);text-align:center;}
+#titlebar h1{font-size:17px;font-weight:800;letter-spacing:2.5px;
+  background:linear-gradient(90deg,#00d2ff,#7c63ff,#00ffa3);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+#titlebar p{font-size:10px;color:rgba(255,255,255,0.4);margin-top:3px;letter-spacing:1.2px;}
+#stats{position:absolute;top:18px;right:18px;
+  background:rgba(5,10,25,0.92);border:1px solid rgba(0,210,255,0.25);
+  border-radius:13px;padding:16px 18px;backdrop-filter:blur(14px);min-width:210px;}
+#stats h3{font-size:10px;color:#00d2ff;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+.sr{display:flex;justify-content:space-between;margin-bottom:3px;}
+.sl{font-size:11px;color:rgba(255,255,255,0.5);}
+.sv{font-size:12px;font-weight:700;color:#fff;}
+.sb{width:100%;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-bottom:8px;overflow:hidden;}
+.sf{height:100%;border-radius:2px;}
+#legend{position:absolute;bottom:60px;left:18px;
+  background:rgba(5,10,25,0.92);border:1px solid rgba(0,210,255,0.25);
+  border-radius:13px;padding:14px 16px;backdrop-filter:blur(14px);}
+#legend h3{font-size:10px;color:#00d2ff;letter-spacing:2px;text-transform:uppercase;margin-bottom:9px;}
+.li{display:flex;align-items:center;gap:8px;margin:5px 0;}
+.ld{width:11px;height:11px;border-radius:3px;}
+.lt{font-size:11px;color:rgba(255,255,255,0.65);}
+#ctrl{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+  background:rgba(5,10,25,0.88);border:1px solid rgba(0,210,255,0.2);
+  border-radius:10px;padding:9px 22px;font-size:10px;color:rgba(255,255,255,0.4);text-align:center;}
+#btns{position:absolute;top:18px;left:18px;display:flex;flex-direction:column;gap:8px;}
+.vb{background:rgba(5,10,25,0.9);border:1px solid rgba(0,210,255,0.28);
+  border-radius:9px;padding:9px 16px;color:rgba(255,255,255,0.75);
+  font-size:11px;cursor:pointer;transition:all .2s;letter-spacing:.5px;pointer-events:auto;}
+.vb:hover{background:rgba(0,210,255,0.12);border-color:#00d2ff;color:#fff;}
+.vb.active{background:rgba(0,210,255,0.18);border-color:#00d2ff;color:#00d2ff;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div id="titlebar">
+      <h1>🛸 3D DIGITAL TWIN</h1>
+      <p>DJI DRONE SURVEY &nbsp;·&nbsp; 18 FRAME &nbsp;·&nbsp; 4000×2250 px</p>
+    </div>
+    <div id="btns">
+      <button class="vb active" id="btn-top"   onclick="setView('top')">⬆ Kuş Bakışı</button>
+      <button class="vb"        id="btn-iso"   onclick="setView('iso')">◈ İzometrik</button>
+      <button class="vb"        id="btn-side"  onclick="setView('side')">◧ Yan Görünüm</button>
+      <button class="vb"        id="btn-drone" onclick="setView('drone')">🛸 Drone Yolu</button>
+    </div>
+    <div id="stats">
+      <h3>📊 Saha Analizi</h3>
+      <div class="sr"><span class="sl">Yeşil Alan</span><span class="sv">59.6 %</span></div>
+      <div class="sb"><div class="sf" style="width:59.6%;background:linear-gradient(90deg,#16a34a,#4ade80)"></div></div>
+      <div class="sr"><span class="sl">Beton / Yapı</span><span class="sv">41.8 %</span></div>
+      <div class="sb"><div class="sf" style="width:41.8%;background:linear-gradient(90deg,#64748b,#cbd5e1)"></div></div>
+      <div class="sr"><span class="sl">Toprak / Zemin</span><span class="sv">24.3 %</span></div>
+      <div class="sb"><div class="sf" style="width:24.3%;background:linear-gradient(90deg,#92400e,#d97706)"></div></div>
+      <div class="sr"><span class="sl">Kenar Yoğunluğu</span><span class="sv">29.8 %</span></div>
+      <div class="sb"><div class="sf" style="width:29.8%;background:linear-gradient(90deg,#6d28d9,#a78bfa)"></div></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.07);margin-top:4px;padding-top:10px;">
+        <div class="sr"><span class="sl">Toplam Kare</span><span class="sv">18</span></div>
+        <div class="sr"><span class="sl">Çözünürlük</span><span class="sv">4K</span></div>
+        <div class="sr"><span class="sl">Cihaz</span><span class="sv">DJI</span></div>
+      </div>
+    </div>
+    <div id="legend">
+      <h3>🗺 Gösterim</h3>
+      <div class="li"><div class="ld" style="background:#22c55e"></div><span class="lt">Vejetasyon</span></div>
+      <div class="li"><div class="ld" style="background:#94a3b8"></div><span class="lt">Beton / Yapı</span></div>
+      <div class="li"><div class="ld" style="background:#b45309"></div><span class="lt">Toprak</span></div>
+      <div class="li"><div class="ld" style="background:#00d2ff;border-radius:50%"></div><span class="lt">Drone Yolu</span></div>
+    </div>
+    <div id="ctrl">🖱 Sol Tık Sürükle = Döndür &nbsp;|&nbsp; Scroll = Zoom &nbsp;|&nbsp; Sağ Tık = Kaydır</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+window.onerror = function(msg, url, line) {
+  const errDiv = document.createElement("div");
+  errDiv.style.position = "absolute";
+  errDiv.style.top = "10px";
+  errDiv.style.left = "10px";
+  errDiv.style.zIndex = "99999";
+  errDiv.style.background = "rgba(255,0,0,0.8)";
+  errDiv.style.color = "white";
+  errDiv.style.padding = "10px";
+  errDiv.style.fontFamily = "sans-serif";
+  errDiv.innerHTML = "Error: " + msg + "<br>Line: " + line;
+  document.body.appendChild(errDiv);
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    const SCENE = [{"file": "DJI_0018.JPG", "green": 0.7691, "concrete": 0.3732, "soil": 0.2029, "edges": 0.3159, "brightness": 118.32, "col": {"r": 35, "g": 54, "b": 26, "freq": 17657}}, {"file": "DJI_0019.JPG", "green": 0.8017, "concrete": 0.3764, "soil": 0.185, "edges": 0.3291, "brightness": 117.96, "col": {"r": 159, "g": 180, "b": 120, "freq": 19702}}, {"file": "DJI_0020.JPG", "green": 0.8009, "concrete": 0.372, "soil": 0.1831, "edges": 0.3435, "brightness": 117.26, "col": {"r": 36, "g": 60, "b": 28, "freq": 20489}}, {"file": "DJI_0021.JPG", "green": 0.8322, "concrete": 0.333, "soil": 0.176, "edges": 0.3489, "brightness": 115.8, "col": {"r": 34, "g": 60, "b": 27, "freq": 21086}}, {"file": "DJI_0022.JPG", "green": 0.7936, "concrete": 0.3378, "soil": 0.1695, "edges": 0.3484, "brightness": 115.32, "col": {"r": 34, "g": 57, "b": 29, "freq": 22020}}, {"file": "DJI_0023.JPG", "green": 0.7534, "concrete": 0.3038, "soil": 0.1492, "edges": 0.3438, "brightness": 112.5, "col": {"r": 32, "g": 53, "b": 28, "freq": 24656}}, {"file": "DJI_0024.JPG", "green": 0.5024, "concrete": 0.3955, "soil": 0.184, "edges": 0.2788, "brightness": 110.04, "col": {"r": 24, "g": 39, "b": 25, "freq": 18178}}, {"file": "DJI_0025.JPG", "green": 0.5188, "concrete": 0.3434, "soil": 0.1477, "edges": 0.2667, "brightness": 111.49, "col": {"r": 28, "g": 46, "b": 29, "freq": 22486}}, {"file": "DJI_0026.JPG", "green": 0.599, "concrete": 0.386, "soil": 0.1475, "edges": 0.2859, "brightness": 114.94, "col": {"r": 29, "g": 50, "b": 25, "freq": 17693}}, {"file": "DJI_0027.JPG", "green": 0.5941, "concrete": 0.4182, "soil": 0.232, "edges": 0.2966, "brightness": 116.14, "col": {"r": 115, "g": 136, "b": 74, "freq": 19054}}, {"file": "DJI_0028.JPG", "green": 0.6328, "concrete": 0.4481, "soil": 0.2734, "edges": 0.3001, "brightness": 118.52, "col": {"r": 111, "g": 134, "b": 70, "freq": 19606}}, {"file": "DJI_0029.JPG", "green": 0.5551, "concrete": 0.4942, "soil": 0.2784, "edges": 0.2825, "brightness": 117.44, "col": {"r": 181, "g": 171, "b": 183, "freq": 19204}}, {"file": "DJI_0030.JPG", "green": 0.3176, "concrete": 0.5744, "soil": 0.5004, "edges": 0.2225, "brightness": 121.54, "col": {"r": 77, "g": 80, "b": 78, "freq": 25437}}, {"file": "DJI_0031.JPG", "green": 0.4467, "concrete": 0.4902, "soil": 0.4453, "edges": 0.2692, "brightness": 122.04, "col": {"r": 109, "g": 125, "b": 61, "freq": 20478}}, {"file": "DJI_0032.JPG", "green": 0.473, "concrete": 0.4899, "soil": 0.3317, "edges": 0.3017, "brightness": 120.59, "col": {"r": 117, "g": 130, "b": 72, "freq": 21373}}, {"file": "DJI_0033.JPG", "green": 0.4957, "concrete": 0.4241, "soil": 0.2623, "edges": 0.2768, "brightness": 116.87, "col": {"r": 111, "g": 130, "b": 66, "freq": 21005}}, {"file": "DJI_0034.JPG", "green": 0.4347, "concrete": 0.4436, "soil": 0.2327, "edges": 0.2674, "brightness": 118.88, "col": {"r": 38, "g": 52, "b": 44, "freq": 19163}}, {"file": "DJI_0035.JPG", "green": 0.4032, "concrete": 0.5155, "soil": 0.2784, "edges": 0.2899, "brightness": 121.38, "col": {"r": 187, "g": 175, "b": 187, "freq": 16459}}];
+
+    const wrap = document.getElementById('wrap');
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(W, H);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.5;
+    wrap.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060c1a);
+    scene.fog = new THREE.FogExp2(0x0a1020, 0.007);
+
+    const camera = new THREE.PerspectiveCamera(52, W/H, 0.1, 2000);
+    let sph = {r:175, theta:0.55, phi:0.62}, tgt = {x:0, y:0, z:0};
+    let drag = false, rclick = false, pmx = 0, pmy = 0;
+
+    function updateCam(){
+      camera.position.set(
+        tgt.x + sph.r * Math.sin(sph.phi) * Math.sin(sph.theta),
+        tgt.y + sph.r * Math.cos(sph.phi),
+        tgt.z + sph.r * Math.sin(sph.phi) * Math.cos(sph.theta)
+      );
+      camera.lookAt(tgt.x, tgt.y, tgt.z);
+    }
+    
+    renderer.domElement.addEventListener('mousedown', e => { drag=true; rclick=(e.button===2); pmx=e.clientX; pmy=e.clientY; });
+    window.addEventListener('mouseup', () => drag=false);
+    renderer.domElement.addEventListener('mousemove', e => {
+      if(!drag) return;
+      const dx = e.clientX - pmx, dy = e.clientY - pmy;
+      pmx = e.clientX; pmy = e.clientY;
+      if(rclick){
+        tgt.x -= dx * 0.07;
+        tgt.z -= dy * 0.07;
+      } else {
+        sph.theta -= dx * 0.005;
+        sph.phi = Math.max(0.04, Math.min(1.52, sph.phi + dy * 0.005));
+      }
+      updateCam();
+    });
+    renderer.domElement.addEventListener('wheel', e => {
+      sph.r = Math.max(15, Math.min(500, sph.r + e.deltaY * 0.12));
+      updateCam();
+    });
+    renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+    updateCam();
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0x3050aa, 1.5));
+    const sun = new THREE.DirectionalLight(0xffe0a0, 2.8);
+    sun.position.set(100, 140, 80);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -160;
+    sun.shadow.camera.right = 160;
+    sun.shadow.camera.top = 160;
+    sun.shadow.camera.bottom = -160;
+    sun.shadow.camera.far = 600;
+    scene.add(sun);
+    
+    const fillLight = new THREE.DirectionalLight(0x6090ff, 0.8);
+    fillLight.position.set(-80, 60, -60);
+    scene.add(fillLight);
+    scene.add(new THREE.HemisphereLight(0x4477bb, 0x224411, 0.9));
+
+    // Grid
+    const grid = new THREE.GridHelper(220, 44, 0x1a3050, 0x0d1e30);
+    grid.position.y = -0.1;
+    scene.add(grid);
+
+    // Ground
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 140, 1, 1),
+      new THREE.MeshStandardMaterial({color:0x1a2e18, roughness:0.92, metalness:0})
+    );
+    ground.rotation.x = -Math.PI/2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const texLoader = new THREE.TextureLoader();
+    texLoader.load('ground_texture.jpg', tex => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      ground.material.map = tex;
+      ground.material.needsUpdate = true;
+    });
+
+    const COLS=6, ROWS=3, CW=30, CH=20;
+    const ox = -(COLS*CW)/2 + CW/2, oz = -(ROWS*CH)/2 + CH/2;
+    const rng = (a, b) => a + Math.random()*(b-a);
+    const pathPts = [];
+
+    SCENE.forEach((d, i) => {
+      const col = i % COLS, row = Math.floor(i / COLS);
+      const cx = ox + col*CW, cz = oz + row*CH;
+      pathPts.push(new THREE.Vector3(cx, 22 + d.brightness*0.06, cz));
+
+      const tc = d.green>0.65 ? 0x1e4a19 : d.concrete>0.48 ? 0x4a5a66 : d.soil>0.38 ? 0x5c3210 : 0x253c20;
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(CW-0.6, 0.3, CH-0.6),
+        new THREE.MeshStandardMaterial({color:tc, roughness:0.9})
+      );
+      base.position.set(cx, 0.15, cz);
+      base.receiveShadow = true;
+      scene.add(base);
+
+      if(d.green > 0.35){
+        for(let t=0, cnt=Math.round(d.green*9); t<cnt; t++){
+          const tx = cx + rng(-(CW/2-2), CW/2-2), tz = cz + rng(-(CH/2-2), CH/2-2), th = rng(2,6);
+          const trunk = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14, 0.22, th, 6),
+            new THREE.MeshStandardMaterial({color:0x4a2e0e, roughness:0.95})
+          );
+          trunk.position.set(tx, th/2, tz);
+          trunk.castShadow = true;
+          scene.add(trunk);
+          
+          const g = rng(0.28, 0.52);
+          const foliage = new THREE.Mesh(
+            new THREE.SphereGeometry(rng(1, 1.9), 7, 5),
+            new THREE.MeshStandardMaterial({color:new THREE.Color(rng(0.05,0.18), g, rng(0,0.1)), roughness:0.9})
+          );
+          foliage.position.set(tx, th + rng(0.5, 1.2), tz);
+          foliage.castShadow = true;
+          scene.add(foliage);
+        }
+      }
+
+      if(d.concrete > 0.28){
+        for(let b=0, cnt=Math.round(d.concrete*6); b<cnt; b++){
+          const bw = rng(2.5, 6.5), bd = rng(2.5, 6.5), bh = (d.edges*14 + d.concrete*8) * rng(0.25, 0.95);
+          const bx = cx + rng(-(CW/2-bw), CW/2-bw), bz = cz + rng(-(CH/2-bd), CH/2-bd);
+          const gv = rng(0.35, 0.65);
+          const bldg = new THREE.Mesh(
+            new THREE.BoxGeometry(bw, bh, bd),
+            new THREE.MeshStandardMaterial({color:new THREE.Color(gv*0.85, gv*0.9, gv), roughness:0.65, metalness:0.1})
+          );
+          bldg.position.set(bx, bh/2, bz);
+          bldg.castShadow = true;
+          bldg.receiveShadow = true;
+          scene.add(bldg);
+          
+          const roof = new THREE.Mesh(
+            new THREE.BoxGeometry(bw+0.15, 0.18, bd+0.15),
+            new THREE.MeshStandardMaterial({color:0x223344, roughness:0.5})
+          );
+          roof.position.set(bx, bh+0.09, bz);
+          scene.add(roof);
+        }
+      }
+
+      if(d.concrete > 0.32 && d.green < 0.68){
+        const road = new THREE.Mesh(
+          new THREE.BoxGeometry(CW-0.5, 0.06, 2.5),
+          new THREE.MeshStandardMaterial({color:0x0d0d0d, roughness:0.98})
+        );
+        road.position.set(cx, 0.35, cz);
+        scene.add(road);
+      }
+    });
+
+    const curve = new THREE.CatmullRomCurve3(pathPts, false, 'catmullrom', 0.5);
+    scene.add(new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 120, 0.22, 7, false),
+      new THREE.MeshStandardMaterial({color:0x00d2ff, emissive:0x003366, emissiveIntensity:0.7, roughness:0.15, metalness:0.9, transparent:true, opacity:0.75})
+    ));
+
+    pathPts.forEach(p => {
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.55, 8, 8),
+        new THREE.MeshStandardMaterial({color:0x00ffa3, emissive:0x00cc66, emissiveIntensity:1.8})
+      );
+      m.position.copy(p);
+      scene.add(m);
+    });
+
+    const droneBody = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 0.4, 2),
+      new THREE.MeshStandardMaterial({color:0xe0e0e0, emissive:0x224488, emissiveIntensity:0.5, metalness:0.8, roughness:0.2})
+    );
+    scene.add(droneBody);
+    
+    const droneLed = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 6, 6),
+      new THREE.MeshStandardMaterial({color:0xff3333, emissive:0xff1111, emissiveIntensity:2.5})
+    );
+    scene.add(droneLed);
+
+    const sv = new Float32Array(2400);
+    for(let i=0; i<2400; i+=3){ sv[i]=rng(-700,700); sv[i+1]=rng(70,400); sv[i+2]=rng(-700,700); }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+    scene.add(new THREE.Points(sg, new THREE.PointsMaterial({color:0xffffff, size:0.5, transparent:true, opacity:0.5})));
+
+    let t = 0;
+    function animate(){
+      requestAnimationFrame(animate);
+      t += 0.004;
+      const u = (t*0.07)%1;
+      const p = curve.getPointAt(u);
+      const p2 = curve.getPointAt(Math.min(u+0.01, 1));
+      
+      droneBody.position.set(p.x, p.y + Math.sin(t*2.5)*0.4, p.z);
+      droneBody.lookAt(p2.x, p2.y, p2.z);
+      droneBody.rotation.x = 0;
+      
+      droneLed.position.set(p.x, p.y + 0.45 + Math.sin(t*2.5)*0.4, p.z);
+      droneLed.visible = Math.sin(t*6) > 0;
+      
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.setView = function(v){
+      document.querySelectorAll('.vb').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-'+v).classList.add('active');
+      if(v==='top') { sph={r:175, theta:0.55, phi:0.62}; tgt={x:0,y:0,z:0}; }
+      else if(v==='iso') { sph={r:160, theta:0.65, phi:0.72}; tgt={x:0,y:0,z:0}; }
+      else if(v==='side') { sph={r:140, theta:0, phi:1.45}; tgt={x:0,y:5,z:0}; }
+      else if(v==='drone') { sph={r:75, theta:1.3, phi:0.55}; tgt={x:0,y:8,z:0}; }
+      updateCam();
+    };
+
+    window.addEventListener('resize', () => {
+      const nw = window.innerWidth, nh = window.innerHeight;
+      camera.aspect = nw / nh;
+      camera.updateProjectionMatrix();
+      renderer.setSize(nw, nh);
+    });
+
+  } catch (err) {
+    window.onerror(err.toString(), "", err.lineNumber || 0);
+  }
+});
+</script>
+</body>
+</html>

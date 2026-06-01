@@ -1,0 +1,578 @@
+[
+  {
+    "file": "DJI_0018.JPG",
+    "index": 0,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 118.32,
+    "contrast": 54.34,
+    "edge_density": 0.3159,
+    "green_ratio": 0.7691,
+    "concrete_ratio": 0.3732,
+    "soil_ratio": 0.2029,
+    "dominant_colors": [
+      {
+        "r": 35,
+        "g": 54,
+        "b": 26,
+        "freq": 17657
+      },
+      {
+        "r": 159,
+        "g": 178,
+        "b": 119,
+        "freq": 17099
+      },
+      {
+        "r": 117,
+        "g": 140,
+        "b": 82,
+        "freq": 15670
+      }
+    ]
+  },
+  {
+    "file": "DJI_0019.JPG",
+    "index": 1,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 117.96,
+    "contrast": 54.66,
+    "edge_density": 0.3291,
+    "green_ratio": 0.8017,
+    "concrete_ratio": 0.3764,
+    "soil_ratio": 0.185,
+    "dominant_colors": [
+      {
+        "r": 159,
+        "g": 180,
+        "b": 120,
+        "freq": 19702
+      },
+      {
+        "r": 33,
+        "g": 54,
+        "b": 26,
+        "freq": 17702
+      },
+      {
+        "r": 114,
+        "g": 140,
+        "b": 84,
+        "freq": 15573
+      }
+    ]
+  },
+  {
+    "file": "DJI_0020.JPG",
+    "index": 2,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 117.26,
+    "contrast": 54.32,
+    "edge_density": 0.3435,
+    "green_ratio": 0.8009,
+    "concrete_ratio": 0.372,
+    "soil_ratio": 0.1831,
+    "dominant_colors": [
+      {
+        "r": 36,
+        "g": 60,
+        "b": 28,
+        "freq": 20489
+      },
+      {
+        "r": 79,
+        "g": 106,
+        "b": 63,
+        "freq": 18055
+      },
+      {
+        "r": 126,
+        "g": 151,
+        "b": 97,
+        "freq": 16059
+      }
+    ]
+  },
+  {
+    "file": "DJI_0021.JPG",
+    "index": 3,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 115.8,
+    "contrast": 55.73,
+    "edge_density": 0.3489,
+    "green_ratio": 0.8322,
+    "concrete_ratio": 0.333,
+    "soil_ratio": 0.176,
+    "dominant_colors": [
+      {
+        "r": 34,
+        "g": 60,
+        "b": 27,
+        "freq": 21086
+      },
+      {
+        "r": 76,
+        "g": 105,
+        "b": 61,
+        "freq": 17988
+      },
+      {
+        "r": 121,
+        "g": 150,
+        "b": 94,
+        "freq": 16123
+      }
+    ]
+  },
+  {
+    "file": "DJI_0022.JPG",
+    "index": 4,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 115.32,
+    "contrast": 58.01,
+    "edge_density": 0.3484,
+    "green_ratio": 0.7936,
+    "concrete_ratio": 0.3378,
+    "soil_ratio": 0.1695,
+    "dominant_colors": [
+      {
+        "r": 34,
+        "g": 57,
+        "b": 29,
+        "freq": 22020
+      },
+      {
+        "r": 77,
+        "g": 103,
+        "b": 65,
+        "freq": 18177
+      },
+      {
+        "r": 123,
+        "g": 149,
+        "b": 100,
+        "freq": 15055
+      }
+    ]
+  },
+  {
+    "file": "DJI_0023.JPG",
+    "index": 5,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 112.5,
+    "contrast": 61.8,
+    "edge_density": 0.3438,
+    "green_ratio": 0.7534,
+    "concrete_ratio": 0.3038,
+    "soil_ratio": 0.1492,
+    "dominant_colors": [
+      {
+        "r": 32,
+        "g": 53,
+        "b": 28,
+        "freq": 24656
+      },
+      {
+        "r": 74,
+        "g": 99,
+        "b": 63,
+        "freq": 16250
+      },
+      {
+        "r": 175,
+        "g": 192,
+        "b": 136,
+        "freq": 14393
+      }
+    ]
+  },
+  {
+    "file": "DJI_0024.JPG",
+    "index": 6,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 110.04,
+    "contrast": 59.68,
+    "edge_density": 0.2788,
+    "green_ratio": 0.5024,
+    "concrete_ratio": 0.3955,
+    "soil_ratio": 0.184,
+    "dominant_colors": [
+      {
+        "r": 24,
+        "g": 39,
+        "b": 25,
+        "freq": 18178
+      },
+      {
+        "r": 148,
+        "g": 159,
+        "b": 111,
+        "freq": 16314
+      },
+      {
+        "r": 193,
+        "g": 186,
+        "b": 190,
+        "freq": 15787
+      }
+    ]
+  },
+  {
+    "file": "DJI_0025.JPG",
+    "index": 7,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 111.49,
+    "contrast": 58.73,
+    "edge_density": 0.2667,
+    "green_ratio": 0.5188,
+    "concrete_ratio": 0.3434,
+    "soil_ratio": 0.1477,
+    "dominant_colors": [
+      {
+        "r": 28,
+        "g": 46,
+        "b": 29,
+        "freq": 22486
+      },
+      {
+        "r": 189,
+        "g": 185,
+        "b": 178,
+        "freq": 16848
+      },
+      {
+        "r": 121,
+        "g": 144,
+        "b": 67,
+        "freq": 14845
+      }
+    ]
+  },
+  {
+    "file": "DJI_0026.JPG",
+    "index": 8,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 114.94,
+    "contrast": 56.3,
+    "edge_density": 0.2859,
+    "green_ratio": 0.599,
+    "concrete_ratio": 0.386,
+    "soil_ratio": 0.1475,
+    "dominant_colors": [
+      {
+        "r": 29,
+        "g": 50,
+        "b": 25,
+        "freq": 17693
+      },
+      {
+        "r": 190,
+        "g": 186,
+        "b": 184,
+        "freq": 15707
+      },
+      {
+        "r": 151,
+        "g": 170,
+        "b": 102,
+        "freq": 15325
+      }
+    ]
+  },
+  {
+    "file": "DJI_0027.JPG",
+    "index": 9,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 116.14,
+    "contrast": 53.25,
+    "edge_density": 0.2966,
+    "green_ratio": 0.5941,
+    "concrete_ratio": 0.4182,
+    "soil_ratio": 0.232,
+    "dominant_colors": [
+      {
+        "r": 115,
+        "g": 136,
+        "b": 74,
+        "freq": 19054
+      },
+      {
+        "r": 29,
+        "g": 48,
+        "b": 27,
+        "freq": 15930
+      },
+      {
+        "r": 189,
+        "g": 183,
+        "b": 188,
+        "freq": 15696
+      }
+    ]
+  },
+  {
+    "file": "DJI_0028.JPG",
+    "index": 10,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 118.52,
+    "contrast": 49.74,
+    "edge_density": 0.3001,
+    "green_ratio": 0.6328,
+    "concrete_ratio": 0.4481,
+    "soil_ratio": 0.2734,
+    "dominant_colors": [
+      {
+        "r": 111,
+        "g": 134,
+        "b": 70,
+        "freq": 19606
+      },
+      {
+        "r": 144,
+        "g": 159,
+        "b": 103,
+        "freq": 16416
+      },
+      {
+        "r": 184,
+        "g": 177,
+        "b": 182,
+        "freq": 16265
+      }
+    ]
+  },
+  {
+    "file": "DJI_0029.JPG",
+    "index": 11,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 117.44,
+    "contrast": 50.99,
+    "edge_density": 0.2825,
+    "green_ratio": 0.5551,
+    "concrete_ratio": 0.4942,
+    "soil_ratio": 0.2784,
+    "dominant_colors": [
+      {
+        "r": 181,
+        "g": 171,
+        "b": 183,
+        "freq": 19204
+      },
+      {
+        "r": 114,
+        "g": 133,
+        "b": 76,
+        "freq": 18430
+      },
+      {
+        "r": 29,
+        "g": 44,
+        "b": 29,
+        "freq": 15451
+      }
+    ]
+  },
+  {
+    "file": "DJI_0030.JPG",
+    "index": 12,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 121.54,
+    "contrast": 39.63,
+    "edge_density": 0.2225,
+    "green_ratio": 0.3176,
+    "concrete_ratio": 0.5744,
+    "soil_ratio": 0.5004,
+    "dominant_colors": [
+      {
+        "r": 77,
+        "g": 80,
+        "b": 78,
+        "freq": 25437
+      },
+      {
+        "r": 107,
+        "g": 121,
+        "b": 62,
+        "freq": 16099
+      },
+      {
+        "r": 134,
+        "g": 140,
+        "b": 96,
+        "freq": 13285
+      }
+    ]
+  },
+  {
+    "file": "DJI_0031.JPG",
+    "index": 13,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 122.04,
+    "contrast": 41.97,
+    "edge_density": 0.2692,
+    "green_ratio": 0.4467,
+    "concrete_ratio": 0.4902,
+    "soil_ratio": 0.4453,
+    "dominant_colors": [
+      {
+        "r": 109,
+        "g": 125,
+        "b": 61,
+        "freq": 20478
+      },
+      {
+        "r": 182,
+        "g": 172,
+        "b": 182,
+        "freq": 18790
+      },
+      {
+        "r": 83,
+        "g": 85,
+        "b": 84,
+        "freq": 15359
+      }
+    ]
+  },
+  {
+    "file": "DJI_0032.JPG",
+    "index": 14,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 120.59,
+    "contrast": 46.04,
+    "edge_density": 0.3017,
+    "green_ratio": 0.473,
+    "concrete_ratio": 0.4899,
+    "soil_ratio": 0.3317,
+    "dominant_colors": [
+      {
+        "r": 117,
+        "g": 130,
+        "b": 72,
+        "freq": 21373
+      },
+      {
+        "r": 184,
+        "g": 176,
+        "b": 186,
+        "freq": 16517
+      },
+      {
+        "r": 147,
+        "g": 153,
+        "b": 123,
+        "freq": 13907
+      }
+    ]
+  },
+  {
+    "file": "DJI_0033.JPG",
+    "index": 15,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 116.87,
+    "contrast": 49.7,
+    "edge_density": 0.2768,
+    "green_ratio": 0.4957,
+    "concrete_ratio": 0.4241,
+    "soil_ratio": 0.2623,
+    "dominant_colors": [
+      {
+        "r": 111,
+        "g": 130,
+        "b": 66,
+        "freq": 21005
+      },
+      {
+        "r": 188,
+        "g": 180,
+        "b": 187,
+        "freq": 15128
+      },
+      {
+        "r": 38,
+        "g": 52,
+        "b": 36,
+        "freq": 14423
+      }
+    ]
+  },
+  {
+    "file": "DJI_0034.JPG",
+    "index": 16,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 118.88,
+    "contrast": 50.87,
+    "edge_density": 0.2674,
+    "green_ratio": 0.4347,
+    "concrete_ratio": 0.4436,
+    "soil_ratio": 0.2327,
+    "dominant_colors": [
+      {
+        "r": 38,
+        "g": 52,
+        "b": 44,
+        "freq": 19163
+      },
+      {
+        "r": 160,
+        "g": 155,
+        "b": 148,
+        "freq": 16186
+      },
+      {
+        "r": 94,
+        "g": 113,
+        "b": 53,
+        "freq": 16132
+      }
+    ]
+  },
+  {
+    "file": "DJI_0035.JPG",
+    "index": 17,
+    "width": 4000,
+    "height": 2250,
+    "brightness": 121.38,
+    "contrast": 47.92,
+    "edge_density": 0.2899,
+    "green_ratio": 0.4032,
+    "concrete_ratio": 0.5155,
+    "soil_ratio": 0.2784,
+    "dominant_colors": [
+      {
+        "r": 187,
+        "g": 175,
+        "b": 187,
+        "freq": 16459
+      },
+      {
+        "r": 126,
+        "g": 134,
+        "b": 91,
+        "freq": 16123
+      },
+      {
+        "r": 91,
+        "g": 104,
+        "b": 60,
+        "freq": 15809
+      }
+    ]
+  }
+]

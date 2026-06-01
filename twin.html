@@ -11,6 +11,11 @@
     --ok: #3dd68c; --warn: #f5c542; --err: #ff5c5c;
     --sidebar-w: 300px; --status-h: 34px;
   }
+  body.theme-light {
+    --bg: #e8ecf2; --panel: rgba(255,255,255,0.94); --panel-border: rgba(0,0,0,.08);
+    --txt: #1a2230; --muted: rgba(26,34,48,.55);
+    --accent-dim: rgba(77,163,255,.12);
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg);
     font-family: "Segoe UI", system-ui, sans-serif; color: var(--txt); font-size: 13px; }
@@ -116,6 +121,63 @@
   #profile-canvas { width: 100%; height: 120px; background: rgba(0,0,0,.3); border-radius: 6px; display: block; }
   .compare-overlay { pointer-events: none; position: fixed; inset: 0; bottom: var(--status-h);
     z-index: 5; mix-blend-mode: multiply; opacity: 0; transition: opacity .4s; }
+
+  /* Collapsible sections */
+  .sec-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+    user-select: none; margin: 12px 0 6px; }
+  .sec-head:first-child { margin-top: 0; }
+  .sec-head .sec-title { margin: 0; }
+  .sec-head .chev { font-size: 10px; color: var(--muted); transition: transform .2s; }
+  .sec-head.collapsed .chev { transform: rotate(-90deg); }
+  .sec-body { overflow: hidden; transition: max-height .25s ease; }
+  .sec-body.collapsed { max-height: 0 !important; }
+
+  /* Building search */
+  #building-search { width: 100%; padding: 6px 8px; margin-bottom: 6px; background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.12); border-radius: 6px; color: var(--txt); font-size: 11px; }
+  body.theme-light #building-search { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.1); }
+
+  /* Analytics */
+  .spark-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 10px; }
+  .spark-row canvas { flex: 1; height: 28px; background: rgba(0,0,0,.2); border-radius: 4px; }
+  #asset-table { width: 100%; font-size: 10px; border-collapse: collapse; }
+  #asset-table th { text-align: left; padding: 4px 3px; color: var(--muted); cursor: pointer; border-bottom: 1px solid var(--panel-border); }
+  #asset-table td { padding: 3px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  #asset-table tr:hover td { color: var(--accent); cursor: pointer; }
+  #asset-table-wrap { max-height: 160px; overflow-y: auto; }
+
+  /* Toasts */
+  #toast-container { position: fixed; top: 60px; right: calc(var(--sidebar-w) + 30px); z-index: 50;
+    display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 280px; }
+  .toast { padding: 8px 12px; border-radius: 8px; font-size: 11px; background: var(--panel);
+    border: 1px solid var(--panel-border); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    animation: toastIn .3s ease; pointer-events: auto; }
+  .toast.warn { border-color: var(--warn); }
+  .toast.err { border-color: var(--err); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+  /* Help overlay */
+  #help-overlay { position: fixed; inset: 0; bottom: var(--status-h); z-index: 60; display: none;
+    background: rgba(0,0,0,.65); align-items: center; justify-content: center; }
+  #help-overlay.visible { display: flex; }
+  #help-panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+    padding: 20px 24px; max-width: 420px; max-height: 80vh; overflow-y: auto; }
+  #help-panel h2 { margin: 0 0 12px; font-size: 16px; }
+  #help-panel kbd { background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+  #help-panel dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 12px; margin: 0; }
+  #help-panel dt { color: var(--muted); }
+
+  /* Onboarding tour */
+  #tour-tip { position: fixed; z-index: 55; display: none; max-width: 260px; padding: 10px 14px;
+    background: var(--accent); color: #fff; border-radius: 10px; font-size: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.4); }
+  #tour-tip.visible { display: block; }
+  #tour-tip .tour-actions { margin-top: 8px; display: flex; gap: 6px; }
+  #tour-tip button { padding: 4px 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; }
+
+  #controls-left.collapsed { transform: translateX(-240px); opacity: 0; pointer-events: none; }
+  #controls-left { transition: transform .3s, opacity .3s; }
+  .panel-collapse-btn { position: absolute; top: 8px; right: 8px; background: none; border: none;
+    color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; }
 </style>
 </head>
 <body>
@@ -139,7 +201,11 @@
 <button class="panel-toggle" id="panel-toggle" title="Panel">☰</button>
 
 <div class="panel" id="sidebar">
-  <div class="sec-title">Saha Özeti</div>
+  <button class="panel-collapse-btn" id="sidebar-collapse" title="Paneli daralt">◀</button>
+  <div class="sec-head" data-sec="overview">
+    <div class="sec-title">Saha Özeti</div><span class="chev">▼</span>
+  </div>
+  <div class="sec-body" id="sec-overview">
   <div class="stat-grid">
     <div class="stat"><div class="k">Boyut</div><div class="v" id="ov-size">—</div></div>
     <div class="stat"><div class="k">Yükseklik</div><div class="v" id="ov-elev">—</div></div>
@@ -149,8 +215,16 @@
   <div class="row" style="margin-top:8px;font-size:11px;color:var(--muted)">
     <span id="ov-dataset">—</span><span id="ov-updated">—</span>
   </div>
+  <div class="stat-grid" style="margin-top:6px">
+    <div class="stat"><div class="k">Toplam alan</div><div class="v"><span id="stat-area">—</span><span class="u"> m²</span></div></div>
+    <div class="stat"><div class="k">Ort. bina h.</div><div class="v"><span id="stat-avg-h">—</span><span class="u"> m</span></div></div>
+  </div>
+  </div>
 
-  <div class="sec-title">Canlı Telemetri</div>
+  <div class="sec-head" data-sec="telemetry">
+    <div class="sec-title">Canlı Telemetri</div><span class="chev">▼</span>
+  </div>
+  <div class="sec-body" id="sec-telemetry">
   <div class="stat-grid">
     <div class="stat"><div class="k">Sıcaklık</div><div class="v"><span id="tel-temp">—</span><span class="u"> °C</span></div></div>
     <div class="stat"><div class="k">Nem</div><div class="v"><span id="tel-hum">—</span><span class="u"> %</span></div></div>
@@ -158,23 +232,56 @@
     <div class="stat"><div class="k">Güneş</div><div class="v"><span id="tel-solar">—</span><span class="u"> W/m²</span></div></div>
   </div>
   <div class="row" style="margin-top:6px"><span>Sistem durumu</span><span class="badge ok" id="sys-badge">Normal</span></div>
+  <div class="sec-title" style="margin-top:8px">Trend (60 dk)</div>
+  <div class="spark-row"><span>Sıcaklık</span><canvas id="spark-temp" width="120" height="28"></canvas></div>
+  <div class="spark-row"><span>Rüzgar</span><canvas id="spark-wind" width="120" height="28"></canvas></div>
+  </div>
 
-  <div class="sec-title">Binalar (telemetri)</div>
+  <div class="sec-head" data-sec="buildings">
+    <div class="sec-title">Binalar</div><span class="chev">▼</span>
+  </div>
+  <div class="sec-body" id="sec-buildings">
+  <input type="search" id="building-search" placeholder="ID, tip veya durum ara…" />
   <div id="building-list"><div style="color:var(--muted);font-size:11px">yükleniyor…</div></div>
+  </div>
 
-  <div class="sec-title">Alarmlar</div>
+  <div class="sec-head" data-sec="analytics">
+    <div class="sec-title">Analitik — Varlık Tablosu</div><span class="chev">▼</span>
+  </div>
+  <div class="sec-body" id="sec-analytics">
+  <div id="asset-table-wrap">
+    <table id="asset-table">
+      <thead><tr>
+        <th data-sort="id">ID</th><th data-sort="type">Tip</th><th data-sort="height_m">H</th>
+        <th data-sort="occupancy_pct">Dol.</th><th data-sort="status">Durum</th>
+      </tr></thead>
+      <tbody id="asset-tbody"><tr><td colspan="5" style="color:var(--muted)">yükleniyor…</td></tr></tbody>
+    </table>
+  </div>
+  </div>
+
+  <div class="sec-head" data-sec="alarms">
+    <div class="sec-title">Alarmlar</div><span class="chev">▼</span>
+  </div>
+  <div class="sec-body" id="sec-alarms">
   <div id="alarm-overall" class="row"><span>Genel durum</span><span class="badge ok" id="alarm-badge">Normal</span></div>
   <div id="alarm-list"><div style="color:var(--muted);font-size:11px">—</div></div>
+  </div>
 
-  <div class="sec-title">IoT Bağlantısı</div>
+  <div class="sec-head" data-sec="iot">
+    <div class="sec-title">IoT Bağlantısı</div><span class="chev">▼</span>
+  </div>
+  <div class="sec-body" id="sec-iot">
   <div id="iot-panel">
     🔌 MQTT/OPC-UA entegrasyonu — yol haritası<br>
-    <span style="font-size:10px">Gerçek sensör akışı için twin_api genişletilebilir.</span>
+    <span style="font-size:10px">WebSocket: <span id="ws-status">bağlanıyor…</span></span>
     <button class="action" style="margin-top:6px;font-size:11px" id="btn-iot-connect" disabled>Bağlan (yakında)</button>
+  </div>
   </div>
 </div>
 
 <div class="panel" id="controls-left">
+  <button class="panel-collapse-btn" id="controls-collapse" title="Paneli daralt">◀</button>
   <div class="sec-title">Araçlar</div>
   <div class="tool-row">
     <button class="tool-btn" data-tool="inspect" id="tool-inspect">İncele</button>
@@ -196,6 +303,20 @@
   <button class="action" id="btn-screenshot">📷 Ekran görüntüsü</button>
   <button class="action" id="btn-demo">🎬 Demo turu</button>
   <button class="action" id="btn-reset">Görünümü sıfırla</button>
+  <button class="action" id="btn-export">📄 Rapor indir (JSON)</button>
+  <button class="action" id="btn-share">🔗 Paylaşım linki kopyala</button>
+
+  <div class="sec-title">Post-Processing</div>
+  <label class="chk"><input type="checkbox" id="fxaa-chk" checked /> FXAA (kenar yumuşatma)</label>
+  <label class="chk"><input type="checkbox" id="bloom-chk" /> Bloom (parlama)</label>
+
+  <div class="sec-title">Katmanlar</div>
+  <label class="chk"><input type="checkbox" id="heatmap-chk" /> Arazi ısı haritası</label>
+  <label class="chk"><input type="checkbox" id="flight-chk" checked /> Drone uçuş yolu</label>
+  <label class="chk"><input type="checkbox" id="wireframe-chk" /> Tel kafes (W)</label>
+
+  <div class="sec-title">Tema</div>
+  <label class="chk"><input type="checkbox" id="theme-chk" /> Açık tema</label>
 
   <div class="sec-title">Zaman ekseni (önce/sonra)</div>
   <div class="row"><label id="time-label">2024 ↔ 2026</label><span id="time-val">2026</span></div>
@@ -252,6 +373,30 @@
 </div>
 <div id="compare-overlay" class="compare-overlay"></div>
 <div id="measure-label"></div>
+<div id="toast-container"></div>
+
+<div id="help-overlay">
+  <div id="help-panel">
+    <h2>⌨ Klavye Kısayolları</h2>
+    <dl>
+      <dt><kbd>R</kbd></dt><dd>Görünümü sıfırla</dd>
+      <dt><kbd>W</kbd></dt><dd>Tel kafes modu</dd>
+      <dt><kbd>D</kbd></dt><dd>Demo turu başlat</dd>
+      <dt><kbd>M</kbd></dt><dd>Mesafe ölçüm aracı</dd>
+      <dt><kbd>H</kbd></dt><dd>Bu yardım paneli</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Panel / inceleme kapat</dd>
+    </dl>
+    <button class="action" id="help-close" style="margin-top:12px">Kapat</button>
+  </div>
+</div>
+
+<div id="tour-tip">
+  <div id="tour-text">—</div>
+  <div class="tour-actions">
+    <button id="tour-next">İleri</button>
+    <button id="tour-skip">Atla</button>
+  </div>
+</div>
 
 <div id="statusbar">
   <span>FPS: <b id="sb-fps">—</b></span><span class="sep">|</span>
@@ -274,6 +419,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 const params = new URLSearchParams(location.search);
 const DATA_DIR = params.get('data') || 'data_real';
@@ -281,7 +429,12 @@ const DATA = `./${DATA_DIR}`;
 const API_URL = '/api/telemetry';
 const API_ASSETS = '/api/assets';
 const API_ALARMS = '/api/alarms';
+const API_HISTORY = '/api/telemetry/history?minutes=60';
+const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/telemetry`;
 const PINS_KEY = 'dt_pins_' + DATA_DIR;
+const PANEL_KEY = 'dt_panels_v2';
+const THEME_KEY = 'dt_theme';
+const TOUR_KEY = 'dt_tour_done';
 
 // --- DOM helpers ---
 const $ = id => document.getElementById(id);
@@ -306,12 +459,23 @@ function smoothDisplay(id, target, decimals = 1) {
 // --- Globals ---
 let renderer, scene, camera, controls, sun, sky, hemiLight, ambLight;
 let composer, ssaoPass, useSSAO = false;
+let fxaaPass, bloomPass, useFXAA = true, useBloom = false;
 let terrain, geometry, terrainMaterial, heightTexture, heightData, baseHeights;
-let buildingsGroup, buildingMesh, buildingData, buildingGeo;
+let heatmapMesh = null, sceneDataFrames = null;
+let buildingsGroup, buildingMesh, buildingData, buildingGeo, buildingMat;
 let water, waterMat, rainSystem = null;
+let flightPathGroup = null, flightMarker = null, flightCurve = null, flightT = 0;
 let meta, initialCamPos, initialTarget;
 let exag = 1.5, currentDetail = 448, shadowMapSize = 1024;
 let orthoThumb = null;
+let wireframeMode = false;
+let selectedBuildingIdx = -1;
+let buildingFilter = '';
+let assetSortKey = 'id', assetSortAsc = true;
+let telemetryHistory = { temp: [], wind: [] };
+let lastAlarmCount = -1;
+let wsConn = null, wsActive = false;
+let tourStep = -1;
 const PERF = {
   performance: { detail: 256, shadow: 1024, pixelRatio: 1.25, ssao: false },
   balanced:    { detail: 448, shadow: 1024, pixelRatio: 1.75, ssao: false },
@@ -395,16 +559,29 @@ async function init() {
     setLoad(60, 'Binalar…');
     try { buildingData = await fetchJSON(`${DATA}/${meta.buildings}`); } catch (_) {}
   }
+  setLoad(65, 'Sahne analizi…');
+  try { sceneDataFrames = await fetchJSON('./scene_data.json'); } catch (_) {
+    try { sceneDataFrames = await fetchJSON(`${DATA}/scene_data.json`); } catch (_) {}
+  }
   setLoad(75, 'Sahne oluşturuluyor…');
   buildScene(albedo, normalTex);
   buildTerrain(currentDetail);
   buildBuildings();
   buildWater();
+  buildHeatmapOverlay();
+  buildFlightPath();
   buildPins();
   buildRain();
   updateOverviewUI();
+  updateSiteStats();
   wireUI();
+  initPanelState();
+  initTheme();
+  initKeyboard();
   initTelemetry();
+  initWebSocket();
+  startOnboardingTour();
+  applyViewFromURL();
   compareOverlay = $('compare-overlay');
   setLoad(100, 'Hazır');
   setTimeout(() => $('loader').classList.add('hidden'), 400);
@@ -535,13 +712,23 @@ function buildBuildings() {
   if (!list.length) return;
   if (!buildingsGroup) { buildingsGroup = new THREE.Group(); scene.add(buildingsGroup); }
   buildingGeo = new THREE.BoxGeometry(1, 1, 1);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xb8b2a6, roughness: 0.82, metalness: 0.04 });
-  buildingMesh = new THREE.InstancedMesh(buildingGeo, mat, list.length);
+  buildingMat = new THREE.MeshStandardMaterial({
+    color: 0xb8b2a6, roughness: 0.82, metalness: 0.04,
+    emissive: 0x000000, emissiveIntensity: 0,
+  });
+  buildingMesh = new THREE.InstancedMesh(buildingGeo, buildingMat, list.length);
   buildingMesh.castShadow = buildingMesh.receiveShadow = true;
   buildingMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3), 3);
   buildingsGroup.add(buildingMesh);
   baseBuildingColors.length = 0;
   positionBuildings();
+}
+
+function updateBuildingNightGlow(hour) {
+  if (!buildingMat) return;
+  const night = hour < 6 || hour > 19;
+  buildingMat.emissive.setHex(night ? 0xffcc66 : 0x000000);
+  buildingMat.emissiveIntensity = night ? 0.35 + 0.15 * Math.sin(clock.getElapsedTime() * 2) : 0;
 }
 
 function positionBuildings() {
@@ -570,14 +757,142 @@ function buildWater() {
   if (water) { scene.remove(water); water.geometry.dispose(); water = null; }
   if (!meta.has_water) return;
   const W = meta.width_m, H = meta.height_m;
-  waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2f6f7e, roughness: 0.12, transparent: true, opacity: 0.62,
+  const waterGeo = new THREE.PlaneGeometry(W, H, 128, 64);
+  waterMat = new THREE.ShaderMaterial({
+    uniforms: {
+      time: { value: 0 },
+      waterColor: { value: new THREE.Color(0x1a5566) },
+      deepColor: { value: new THREE.Color(0x0a2838) },
+      sunDir: { value: new THREE.Vector3(0.5, 0.8, 0.3) },
+      skyColor: { value: new THREE.Color(0x88bbdd) },
+    },
+    vertexShader: `
+      uniform float time;
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+      void main() {
+        vec3 pos = position;
+        float wave = sin(pos.x * 0.15 + time * 1.2) * 0.12
+                   + cos(pos.y * 0.12 + time * 0.9) * 0.10
+                   + sin((pos.x + pos.y) * 0.08 + time * 1.5) * 0.06;
+        pos.z += wave;
+        vec3 dx = vec3(0.05, 0.0, sin((pos.x + 0.05) * 0.15 + time * 1.2) * 0.12 - wave);
+        vec3 dy = vec3(0.0, 0.05, cos((pos.y + 0.05) * 0.12 + time * 0.9) * 0.10 - wave);
+        vNormal = normalize(cross(dy - vec3(0,0,wave), dx - vec3(0,0,wave)));
+        vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 waterColor, deepColor, skyColor, sunDir;
+      varying vec3 vWorldPos;
+      varying vec3 vNormal;
+      void main() {
+        vec3 n = normalize(vNormal);
+        vec3 viewDir = normalize(cameraPosition - vWorldPos);
+        float fresnel = pow(1.0 - max(dot(viewDir, n), 0.0), 3.0);
+        vec3 refl = reflect(-viewDir, n);
+        float sky = max(refl.y, 0.0);
+        vec3 col = mix(waterColor, deepColor, 0.3);
+        col = mix(col, skyColor, fresnel * 0.65 + sky * 0.15);
+        float spec = pow(max(dot(reflect(-sunDir, n), viewDir), 0.0), 64.0);
+        col += vec3(1.0) * spec * 0.4;
+        gl_FragColor = vec4(col, 0.72);
+      }`,
+    transparent: true,
+    side: THREE.DoubleSide,
   });
-  water = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 64, 24), waterMat);
+  water = new THREE.Mesh(waterGeo, waterMat);
   water.rotation.x = -Math.PI / 2;
   water.receiveShadow = true;
   water.position.y = (meta.water_level_m || 0) * exag;
   scene.add(water);
+}
+
+function buildHeatmapOverlay() {
+  if (heatmapMesh) { scene.remove(heatmapMesh); heatmapMesh.geometry.dispose(); heatmapMesh.material.dispose(); heatmapMesh = null; }
+  if (!sceneDataFrames?.length) return;
+  const W = meta.width_m, H = meta.height_m;
+  const res = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = res; canvas.height = res;
+  const ctx = canvas.getContext('2d');
+  const n = sceneDataFrames.length;
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / cols);
+  for (let i = 0; i < n; i++) {
+    const f = sceneDataFrames[i];
+    const cx = (i % cols) / cols, cy = Math.floor(i / cols) / rows;
+    const cw = 1 / cols, ch = 1 / rows;
+    const g = f.green_ratio || 0, c = f.concrete_ratio || 0, s = f.soil_ratio || 0;
+    const r = Math.round(c * 200 + s * 160 + g * 40);
+    const gC = Math.round(g * 200 + c * 80);
+    const b = Math.round(s * 100 + g * 60 + c * 40);
+    ctx.fillStyle = `rgba(${r},${gC},${b},0.55)`;
+    ctx.fillRect(cx * res, cy * res, cw * res + 1, ch * res + 1);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  heatmapMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.MultiplyBlending })
+  );
+  heatmapMesh.rotation.x = -Math.PI / 2;
+  heatmapMesh.position.y = 0.8;
+  heatmapMesh.visible = false;
+  heatmapMesh.renderOrder = 1;
+  scene.add(heatmapMesh);
+}
+
+async function buildFlightPath() {
+  if (flightPathGroup) { scene.remove(flightPathGroup); flightPathGroup = null; }
+  flightPathGroup = new THREE.Group();
+  let mosaicMeta = null;
+  try { mosaicMeta = await fetchJSON('./mosaic_meta.json'); } catch (_) {
+    try { mosaicMeta = await fetchJSON(`${DATA}/mosaic_meta.json`); } catch (_) {}
+  }
+  const W = meta.width_m, H = meta.height_m;
+  const mw = mosaicMeta?.mosaic_w || meta.resolution_px || 196;
+  const mh = mosaicMeta?.mosaic_h || Math.round(mw * H / W);
+  const points = [];
+  const images = mosaicMeta?.images || [];
+  if (images.length) {
+    for (const img of images) {
+      const bb = img.bbox || [0, 0, 0, 0];
+      const px = (bb[0] + bb[2]) / 2, py = (bb[1] + bb[3]) / 2;
+      const u = px / mw, v = py / mh;
+      const wx = (u - 0.5) * W, wz = (v - 0.5) * H;
+      const y = terrainElevationAt(u, v) + 3;
+      points.push(new THREE.Vector3(wx, y, wz));
+    }
+  } else if (sceneDataFrames?.length) {
+    const n = sceneDataFrames.length, cols = Math.ceil(Math.sqrt(n));
+    for (let i = 0; i < n; i++) {
+      const u = ((i % cols) + 0.5) / cols, v = (Math.floor(i / cols) + 0.5) / Math.ceil(n / cols);
+      points.push(new THREE.Vector3((u - 0.5) * W, terrainElevationAt(u, v) + 3, (v - 0.5) * H));
+    }
+  }
+  if (points.length < 2) return;
+  flightCurve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.4);
+  const linePts = flightCurve.getPoints(Math.max(64, points.length * 8));
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(linePts),
+    new THREE.LineBasicMaterial({ color: 0xff6600, linewidth: 2, transparent: true, opacity: 0.85 })
+  );
+  flightPathGroup.add(line);
+  for (const p of points) {
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.4, 6, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffaa44 })
+    );
+    dot.position.copy(p);
+    flightPathGroup.add(dot);
+  }
+  flightMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff2200 })
+  );
+  flightPathGroup.add(flightMarker);
+  scene.add(flightPathGroup);
 }
 
 function buildRain() {
@@ -728,7 +1043,76 @@ function initTelemetry() {
   fetchTelemetry();
   fetchAssets();
   fetchAlarms();
-  setInterval(() => { fetchTelemetry(); fetchAlarms(); }, 2500);
+  fetchTelemetryHistory();
+  setInterval(() => { if (!wsActive) fetchTelemetry(); fetchAlarms(); }, 2500);
+  setInterval(fetchTelemetryHistory, 15000);
+}
+
+function initWebSocket() {
+  if (!window.WebSocket) { $('ws-status').textContent = 'desteklenmiyor'; return; }
+  try {
+    wsConn = new WebSocket(WS_URL);
+    wsConn.onopen = () => { wsActive = true; $('ws-status').textContent = 'bağlı ✓'; $('sb-api').textContent = 'Telemetri: WebSocket ✓'; };
+    wsConn.onmessage = (ev) => {
+      try {
+        telemetry = JSON.parse(ev.data);
+        telemetrySource = 'WebSocket';
+        recordLocalHistory(telemetry.environment);
+      } catch (_) {}
+    };
+    wsConn.onclose = () => { wsActive = false; $('ws-status').textContent = 'polling'; setTimeout(initWebSocket, 5000); };
+    wsConn.onerror = () => { wsActive = false; $('ws-status').textContent = 'polling'; };
+  } catch (_) { $('ws-status').textContent = 'polling'; }
+}
+
+async function fetchTelemetryHistory() {
+  try {
+    const r = await fetch(API_HISTORY, { signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      const data = await r.json();
+      telemetryHistory.temp = data.samples.map(s => s.temperature_c).filter(v => v != null);
+      telemetryHistory.wind = data.samples.map(s => s.wind_speed_ms).filter(v => v != null);
+      drawSparkline('spark-temp', telemetryHistory.temp, '#ff8844');
+      drawSparkline('spark-wind', telemetryHistory.wind, '#4da3ff');
+      return;
+    }
+  } catch (_) {}
+}
+
+function recordLocalHistory(env) {
+  if (!env) return;
+  telemetryHistory.temp.push(env.temperature_c);
+  telemetryHistory.wind.push(env.wind_speed_ms);
+  if (telemetryHistory.temp.length > 60) telemetryHistory.temp.shift();
+  if (telemetryHistory.wind.length > 60) telemetryHistory.wind.shift();
+  drawSparkline('spark-temp', telemetryHistory.temp, '#ff8844');
+  drawSparkline('spark-wind', telemetryHistory.wind, '#4da3ff');
+}
+
+function drawSparkline(id, values, color) {
+  const cvs = $(id);
+  if (!cvs || !values.length) return;
+  const ctx = cvs.getContext('2d');
+  const w = cvs.width, h = cvs.height;
+  ctx.clearRect(0, 0, w, h);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = Math.max(0.01, max - min);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < values.length; i++) {
+    const x = (i / Math.max(1, values.length - 1)) * (w - 4) + 2;
+    const y = h - 2 - ((values[i] - min) / range) * (h - 4);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function showToast(msg, level = 'info') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (level === 'warning' ? ' warn' : level === 'critical' ? ' err' : '');
+  el.textContent = msg;
+  $('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
 }
 
 async function fetchTelemetry() {
@@ -737,7 +1121,8 @@ async function fetchTelemetry() {
     if (r.ok) {
       telemetry = await r.json();
       telemetrySource = 'API';
-      $('sb-api').textContent = 'Telemetri: API ✓';
+      $('sb-api').textContent = wsActive ? 'Telemetri: WebSocket ✓' : 'Telemetri: API ✓';
+      recordLocalHistory(telemetry.environment);
       return;
     }
   } catch (_) {}
@@ -756,15 +1141,17 @@ async function fetchTelemetry() {
   }
   telemetry = simTelemetry;
   telemetrySource = 'simülasyon';
-  $('sb-api').textContent = 'Telemetri: simülasyon';
+  $('sb-api').textContent = wsActive ? 'Telemetri: WebSocket ✓' : 'Telemetri: simülasyon';
+  recordLocalHistory(simTelemetry.environment);
 }
 
 async function fetchAssets() {
   try {
     const r = await fetch(API_ASSETS, { signal: AbortSignal.timeout(1500) });
-    if (r.ok) { assetsRegistry = await r.json(); return; }
+    if (r.ok) { assetsRegistry = await r.json(); updateAssetTable(); return; }
   } catch (_) {}
   if (!assetsRegistry) initSimAssets();
+  updateAssetTable();
 }
 
 async function fetchAlarms() {
@@ -785,11 +1172,17 @@ function updateAlarmsUI() {
   const show = (alarmsData.alarms || []).slice(0, 6);
   if (!show.length) {
     list.innerHTML = '<div style="color:var(--muted);font-size:11px">Aktif alarm yok</div>';
-    return;
+  } else {
+    list.innerHTML = show.map(a =>
+      `<div class="alm"><span class="badge ${a.level==='critical'?'err':a.level==='warning'?'warn':'ok'}">${a.category||'—'}</span> ${a.message}</div>`
+    ).join('');
   }
-  list.innerHTML = show.map(a =>
-    `<div class="alm"><span class="badge ${a.level==='critical'?'err':a.level==='warning'?'warn':'ok'}">${a.category||'—'}</span> ${a.message}</div>`
-  ).join('');
+  const cnt = alarmsData.count || 0;
+  if (cnt > lastAlarmCount && lastAlarmCount >= 0) {
+    const newest = (alarmsData.alarms || [])[0];
+    if (newest) showToast(`⚠ ${newest.message}`, newest.level);
+  }
+  lastAlarmCount = cnt;
 }
 
 function getAssetForBuilding(idx) {
@@ -814,17 +1207,73 @@ function updateTelemetryUI() {
   else if (warns < 4) { badge.className = 'badge warn'; badge.textContent = `${warns} uyarı`; }
   else { badge.className = 'badge err'; badge.textContent = `${warns} kritik`; }
 
+  updateBuildingList();
+  updateAssetTable();
+}
+
+function updateBuildingList() {
   const list = $('building-list');
-  const show = telemetry.buildings.slice(0, 12);
+  const q = buildingFilter.toLowerCase();
+  const assets = assetsRegistry?.assets || [];
+  let items = telemetry.buildings.map((b, i) => {
+    const asset = assets.find(a => a.id === b.id) || {};
+    return { ...b, type: asset.type || '', idx: i };
+  });
+  if (q) {
+    items = items.filter(b =>
+      b.id.toLowerCase().includes(q) ||
+      (b.type || '').toLowerCase().includes(q) ||
+      b.status.includes(q)
+    );
+  }
+  const show = items.slice(0, 20);
+  if (!show.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:11px">Sonuç yok</div>';
+    return;
+  }
   list.innerHTML = show.map(b =>
-    `<div class="row" data-bid="${b.id}"><span>${b.id}</span><span>${b.occupancy_pct.toFixed(0)}% · ${b.energy_kwh.toFixed(0)} kWh <span class="badge ${b.status==='warning'?'warn':'ok'}">${b.status==='warning'?'⚠':'✓'}</span></span></div>`
+    `<div class="row" data-bid="${b.id}" data-idx="${b.idx}"><span>${b.id}</span><span>${b.type || '—'} · ${b.occupancy_pct.toFixed(0)}% <span class="badge ${b.status==='warning'?'warn':'ok'}">${b.status==='warning'?'⚠':'✓'}</span></span></div>`
   ).join('');
   list.querySelectorAll('.row').forEach(row => {
+    row.addEventListener('click', () => focusBuilding(+row.dataset.idx));
+  });
+}
+
+function updateAssetTable() {
+  const tbody = $('asset-tbody');
+  if (!assetsRegistry?.assets?.length) return;
+  let assets = [...assetsRegistry.assets];
+  assets.sort((a, b) => {
+    let va = a[assetSortKey], vb = b[assetSortKey];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return assetSortAsc ? -1 : 1;
+    if (va > vb) return assetSortAsc ? 1 : -1;
+    return 0;
+  });
+  tbody.innerHTML = assets.map(a => {
+    const bc = a.status === 'warning' ? 'warn' : 'ok';
+    const lbl = a.status === 'warning' ? 'Uyarı' : 'Normal';
+    return `<tr data-id="${a.id}"><td>${a.id}</td><td>${a.type||'—'}</td><td>${(a.height_m||0).toFixed(1)}</td><td>${(a.occupancy_pct||0).toFixed(0)}%</td><td><span class="badge ${bc}">${lbl}</span></td></tr>`;
+  }).join('');
+  tbody.querySelectorAll('tr').forEach(row => {
     row.addEventListener('click', () => {
-      const idx = parseInt(row.dataset.bid.split('-')[1], 10) - 1;
+      const idx = parseInt(row.dataset.id.split('-')[1], 10) - 1;
       focusBuilding(idx);
     });
   });
+}
+
+function updateSiteStats() {
+  const list = buildingData?.buildings || [];
+  let totalArea = 0, totalH = 0;
+  const W = meta.width_m, H = meta.height_m;
+  for (const b of list) {
+    totalArea += (b.su || 0) * W * (b.sv || 0) * H;
+    totalH += b.height_m || 0;
+  }
+  $('stat-area').textContent = totalArea > 0 ? totalArea.toFixed(0) : (meta.asset_summary?.site_area_m2 || '—');
+  $('stat-avg-h').textContent = list.length ? (totalH / list.length).toFixed(1) : '—';
 }
 
 function getBuildingTelemetry(idx) {
@@ -922,6 +1371,7 @@ function onClick(ev) {
 }
 
 function showBuildingInspect(idx) {
+  selectedBuildingIdx = idx;
   const b = buildingData.buildings[idx];
   const tel = getBuildingTelemetry(idx);
   const asset = getAssetForBuilding(idx);
@@ -1212,17 +1662,157 @@ function applyPerf(name) {
   positionBuildings();
 }
 
-function setSSAO(on) {
-  if (on && !composer) {
+function setupComposer() {
+  if (!composer) {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
     try {
-      composer = new EffectComposer(renderer);
-      composer.addPass(new RenderPass(scene, camera));
       ssaoPass = new SSAOPass(scene, camera, renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+      ssaoPass.enabled = false;
       composer.addPass(ssaoPass);
-      composer.addPass(new OutputPass());
-    } catch (_) { composer = null; }
+    } catch (_) {}
+    try {
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(renderer.domElement.clientWidth, renderer.domElement.clientHeight),
+        0.35, 0.4, 0.85
+      );
+      bloomPass.enabled = useBloom;
+      composer.addPass(bloomPass);
+    } catch (_) {}
+    try {
+      fxaaPass = new ShaderPass(FXAAShader);
+      const pr = renderer.getPixelRatio();
+      fxaaPass.material.uniforms.resolution.value.set(1 / (renderer.domElement.clientWidth * pr), 1 / (renderer.domElement.clientHeight * pr));
+      fxaaPass.enabled = useFXAA;
+      composer.addPass(fxaaPass);
+    } catch (_) {}
+    composer.addPass(new OutputPass());
   }
+  useSSAO = !!ssaoPass && ($('perf')?.value === 'quality');
+}
+
+function setSSAO(on) {
+  setupComposer();
+  if (ssaoPass) ssaoPass.enabled = on;
   useSSAO = on && !!composer;
+}
+
+function setPostFX() {
+  setupComposer();
+  if (fxaaPass) fxaaPass.enabled = useFXAA;
+  if (bloomPass) bloomPass.enabled = useBloom;
+}
+
+function toggleWireframe(on) {
+  wireframeMode = on;
+  if (terrainMaterial) terrainMaterial.wireframe = on;
+  if (buildingMat) buildingMat.wireframe = on;
+  if (waterMat) waterMat.wireframe = on;
+}
+
+function exportSceneReport() {
+  const b = selectedBuildingIdx >= 0 ? buildingData?.buildings?.[selectedBuildingIdx] : null;
+  const report = {
+    exported_at: new Date().toISOString(),
+    site: meta,
+    selected_building: b ? { ...b, telemetry: getBuildingTelemetry(selectedBuildingIdx) } : null,
+    camera: { position: camera.position.toArray(), target: controls.target.toArray() },
+    dataset: DATA_DIR,
+  };
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dijital-ikiz-rapor-${Date.now()}.json`;
+  a.click();
+  showToast('Rapor indirildi');
+}
+
+function copyShareLink() {
+  const view = $('preset-view').value || 'bird';
+  const p = new URLSearchParams({ data: DATA_DIR, view });
+  const url = `${location.origin}${location.pathname}?${p.toString()}`;
+  navigator.clipboard.writeText(url).then(() => showToast('Paylaşım linki kopyalandı')).catch(() => {
+    prompt('Link:', url);
+  });
+}
+
+function applyViewFromURL() {
+  const view = params.get('view');
+  if (view) applyPreset(view);
+}
+
+function initTheme() {
+  const light = localStorage.getItem(THEME_KEY) === 'light';
+  document.body.classList.toggle('theme-light', light);
+  if ($('theme-chk')) $('theme-chk').checked = light;
+}
+
+function initPanelState() {
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(PANEL_KEY) || '{}'); } catch (_) {}
+  document.querySelectorAll('.sec-head').forEach(head => {
+    const id = head.dataset.sec;
+    const body = $('sec-' + id);
+    if (!body) return;
+    const collapsed = state[id] === false;
+    head.classList.toggle('collapsed', collapsed);
+    body.classList.toggle('collapsed', collapsed);
+    if (!collapsed) body.style.maxHeight = body.scrollHeight + 'px';
+    head.addEventListener('click', () => {
+      const now = body.classList.toggle('collapsed');
+      head.classList.toggle('collapsed', now);
+      if (!now) body.style.maxHeight = body.scrollHeight + 'px';
+      else body.style.maxHeight = '0';
+      state[id] = !now;
+      localStorage.setItem(PANEL_KEY, JSON.stringify(state));
+    });
+  });
+  if (state.sidebar === false) $('sidebar').classList.add('collapsed');
+  if (state.controls === false) $('controls-left').classList.add('collapsed');
+}
+
+function initKeyboard() {
+  window.addEventListener('keydown', ev => {
+    if (ev.target.matches('input, textarea, select')) return;
+    const k = ev.key.toLowerCase();
+    if (k === 'r') { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); showToast('Görünüm sıfırlandı'); }
+    else if (k === 'w') { $('wireframe-chk').checked = !wireframeMode; toggleWireframe(!wireframeMode); }
+    else if (k === 'd') startDemoTour();
+    else if (k === 'm') { activeTool = 'measure'; document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === 'measure')); $('sb-tool').textContent = 'Araç: Mesafe'; clearMeasure(); }
+    else if (k === 'h') $('help-overlay').classList.toggle('visible');
+    else if (k === 'escape') { $('inspect').classList.remove('visible'); $('help-overlay').classList.remove('visible'); $('profile-panel').classList.remove('visible'); }
+  });
+}
+
+const TOUR_STEPS = [
+  { text: 'Hoş geldiniz! Bu dijital ikiz platformu gerçek drone verisiyle çalışır.', el: '#header' },
+  { text: 'Sağ panelde canlı telemetri, bina arama ve analitik tablo bulunur.', el: '#sidebar' },
+  { text: 'Sol panelden ölçüm araçları, post-processing ve katmanları yönetin.', el: '#controls-left' },
+  { text: 'Klavye: R sıfırla, W tel kafes, D demo, M mesafe, H yardım.', el: '#statusbar' },
+];
+
+function startOnboardingTour() {
+  if (sessionStorage.getItem(TOUR_KEY)) return;
+  tourStep = 0;
+  showTourStep();
+}
+
+function showTourStep() {
+  const tip = $('tour-tip');
+  if (tourStep >= TOUR_STEPS.length) {
+    tip.classList.remove('visible');
+    sessionStorage.setItem(TOUR_KEY, '1');
+    return;
+  }
+  const step = TOUR_STEPS[tourStep];
+  $('tour-text').textContent = step.text;
+  tip.classList.add('visible');
+  const target = document.querySelector(step.el);
+  if (target) {
+    const r = target.getBoundingClientRect();
+    tip.style.top = Math.min(window.innerHeight - 120, r.bottom + 8) + 'px';
+    tip.style.left = Math.min(window.innerWidth - 280, r.left) + 'px';
+  }
 }
 
 // --- Wire UI ---
@@ -1241,13 +1831,48 @@ function wireUI() {
   $('btn-screenshot').addEventListener('click', exportScreenshot);
   $('btn-demo').addEventListener('click', startDemoTour);
   $('btn-reset').addEventListener('click', () => { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); });
+  $('btn-export').addEventListener('click', exportSceneReport);
+  $('btn-share').addEventListener('click', copyShareLink);
   $('inspect-close').addEventListener('click', () => $('inspect').classList.remove('visible'));
   $('profile-close').addEventListener('click', () => { $('profile-panel').classList.remove('visible'); clearMeasure(); activeTool = 'inspect'; });
+  $('help-close').addEventListener('click', () => $('help-overlay').classList.remove('visible'));
   $('time-axis').addEventListener('input', () => applyTimeAxis(+$('time-axis').value));
   applyTimeAxis(100);
   $('buildingschk').addEventListener('change', e => { if (buildingsGroup) buildingsGroup.visible = e.target.checked; });
   $('waterchk').addEventListener('change', e => { if (water) water.visible = e.target.checked; });
   $('fogchk').addEventListener('change', () => applyWeather($('weather').value));
+  $('fxaa-chk').addEventListener('change', e => { useFXAA = e.target.checked; setPostFX(); });
+  $('bloom-chk').addEventListener('change', e => { useBloom = e.target.checked; setPostFX(); });
+  $('heatmap-chk').addEventListener('change', e => { if (heatmapMesh) heatmapMesh.visible = e.target.checked; });
+  $('flight-chk').addEventListener('change', e => { if (flightPathGroup) flightPathGroup.visible = e.target.checked; });
+  $('wireframe-chk').addEventListener('change', e => toggleWireframe(e.target.checked));
+  $('theme-chk').addEventListener('change', e => {
+    document.body.classList.toggle('theme-light', e.target.checked);
+    localStorage.setItem(THEME_KEY, e.target.checked ? 'light' : 'dark');
+  });
+  $('building-search').addEventListener('input', e => { buildingFilter = e.target.value; updateBuildingList(); });
+  $('sidebar-collapse').addEventListener('click', () => {
+    $('sidebar').classList.toggle('collapsed');
+    let s = {}; try { s = JSON.parse(localStorage.getItem(PANEL_KEY) || '{}'); } catch (_) {}
+    s.sidebar = !$('sidebar').classList.contains('collapsed');
+    localStorage.setItem(PANEL_KEY, JSON.stringify(s));
+  });
+  $('controls-collapse').addEventListener('click', () => {
+    $('controls-left').classList.toggle('collapsed');
+    let s = {}; try { s = JSON.parse(localStorage.getItem(PANEL_KEY) || '{}'); } catch (_) {}
+    s.controls = !$('controls-left').classList.contains('collapsed');
+    localStorage.setItem(PANEL_KEY, JSON.stringify(s));
+  });
+  document.querySelectorAll('#asset-table th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (assetSortKey === key) assetSortAsc = !assetSortAsc;
+      else { assetSortKey = key; assetSortAsc = true; }
+      updateAssetTable();
+    });
+  });
+  $('tour-next').addEventListener('click', () => { tourStep++; showTourStep(); });
+  $('tour-skip').addEventListener('click', () => { tourStep = TOUR_STEPS.length; showTourStep(); });
 
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1265,6 +1890,7 @@ function wireUI() {
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('click', onClick);
   window.addEventListener('resize', onResize);
+  setupComposer();
 }
 
 function onResize() {
@@ -1272,7 +1898,14 @@ function onResize() {
   camera.aspect = window.innerWidth / h;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, h);
-  if (composer) composer.setSize(window.innerWidth, h);
+  if (composer) {
+    composer.setSize(window.innerWidth, h);
+    if (fxaaPass) {
+      const pr = renderer.getPixelRatio();
+      fxaaPass.material.uniforms.resolution.value.set(1 / (window.innerWidth * pr), 1 / (h * pr));
+    }
+    if (bloomPass) bloomPass.setSize(window.innerWidth, h);
+  }
 }
 
 // --- Animate ---
@@ -1288,15 +1921,20 @@ function animate() {
     updateAlarmsUI();
   }
   controls.update();
-  updateDemoTour(clock.getDelta());
-  if (water) {
-    const pos = water.geometry.attributes.position;
-    const t = clock.getElapsedTime();
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i);
-      pos.setZ(i, Math.sin(x*0.06+t)*0.15 + Math.cos(y*0.08+t*0.9)*0.15);
-    }
-    pos.needsUpdate = true;
+  const dt = clock.getDelta();
+  updateDemoTour(dt);
+  const hour = +$('tod').value;
+  updateBuildingNightGlow(hour);
+  if (waterMat?.uniforms) {
+    waterMat.uniforms.time.value = clock.getElapsedTime();
+    if (sun) waterMat.uniforms.sunDir.value.copy(sun.position).normalize();
+    if (sky) waterMat.uniforms.skyColor.value.set(0x88bbdd);
+  }
+  if (flightCurve && flightMarker) {
+    flightT = (flightT + dt * 0.08) % 1;
+    const pos = flightCurve.getPointAt(flightT);
+    flightMarker.position.copy(pos);
+    flightMarker.position.y += Math.sin(clock.getElapsedTime() * 3) * 0.5;
   }
   if (rainSystem?.visible) {
     const pos = rainSystem.geometry.attributes.position;
@@ -1308,7 +1946,8 @@ function animate() {
     pos.needsUpdate = true;
   }
   drawMinimap();
-  if (useSSAO && composer) composer.render();
+  const useComposer = composer && (useSSAO || useFXAA || useBloom);
+  if (useComposer) composer.render();
   else renderer.render(scene, camera);
 }
 

@@ -8,6 +8,7 @@ Usage:
     python run_twin.py                  # stitch (gerekirse) + ingest
     python run_twin.py --serve          # ingest sonrası sunucuları başlat
     python run_twin.py --serve --port 8765
+    python run_twin.py --serve --open   # tarayıcıyı otomatik aç
     python run_twin.py --no-stitch      # yalnızca ingest (mosaic.jpg mevcut)
 """
 
@@ -53,6 +54,8 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=8000,
                     help="serve.py portu (varsayılan 8000)")
     ap.add_argument("--host", default="localhost")
+    ap.add_argument("--open", action="store_true",
+                    help="Sunucu başladıktan sonra tarayıcıyı aç")
     ap.add_argument("--gsd", type=float, default=0.15)
     ap.add_argument("--max-elev", type=float, default=16.0)
     ap.add_argument("--min-elev", type=float, default=0.0)
@@ -104,13 +107,20 @@ def main() -> int:
     )
     time.sleep(0.5)
 
-    serve_proc = subprocess.Popen(
-        [py, "serve.py", "--host", args.host, "--port", str(args.port),
-         "--no-browser", "--page", "twin.html"],
-        cwd=HERE,
-    )
+    serve_args = [py, "serve.py", "--host", args.host, "--port", str(args.port),
+                  "--page", "twin.html"]
+    if not args.open:
+        serve_args.append("--no-browser")
+    serve_proc = subprocess.Popen(serve_args, cwd=HERE)
 
-    print(f"\n  Ana sayfa:  http://{args.host}:{args.port}/twin.html")
+    url = f"http://{args.host}:{args.port}/twin.html"
+    print(f"\n  Ana sayfa:  {url}")
+    if args.open:
+        import webbrowser
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
     print(f"  API:        http://{args.host}:{args.port}/api/telemetry")
     print(f"  Standalone: http://{args.host}:{args.api_port}/api/telemetry")
     print("\nDurdurmak için Ctrl+C")

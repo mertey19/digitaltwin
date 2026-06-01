@@ -3,28 +3,28 @@
 twin_api.py — Dijital ikiz canlı telemetri ve varlık API'si.
 
 Endpoints:
-    GET /api/telemetry  — ortam + bina telemetrisi
-    GET /api/assets   — bina/varlık kaydı (buildings.json genişletilmiş)
-    GET /api/alarms   — eşik tabanlı alarmlar
+    GET /api/telemetry          — ortam + bina telemetrisi
+    GET /api/telemetry/history  — son N dakika telemetri geçmişi
+    GET /api/assets             — bina/varlık kaydı
+    GET /api/alarms             — eşik tabanlı alarmlar
+    WS  /ws/telemetry           — gerçek zamanlı push (serve.py üzerinden)
 
 Standalone:
     python twin_api.py --port 8001
-
-serve.py aynı portta /api/* yollarını da sunar.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import os
 import random
 import time
+from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import urlparse
-
-import os
+from urllib.parse import parse_qs, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 META_PATH = os.path.join(HERE, "data_real", "site_meta.json")
@@ -33,6 +33,10 @@ BUILDINGS_PATH = os.path.join(HERE, "data_real", "buildings.json")
 _SEED = int(time.time()) % 100_000
 _rng = random.Random(_SEED)
 _start = time.time()
+
+# Telemetri geçmişi (sparkline / history endpoint)
+_HISTORY: deque[dict[str, Any]] = deque(maxlen=720)
+_HISTORY_LOCK = __import__("threading").Lock()
 
 # Alarm eşikleri
 WATER_LEVEL_WARN_M = 13.0
@@ -60,6 +64,20 @@ def _building_count() -> int:
     if "count" in data:
         return int(data["count"])
     return len(data.get("buildings", []))
+
+
+def _record_history(snapshot: dict[str, Any]) -> None:
+    env = snapshot.get("environment", {})
+    with _HISTORY_LOCK:
+        _HISTORY.append({
+            "t": time.time(),
+            "timestamp": snapshot.get("timestamp"),
+            "temperature_c": env.get("temperature_c"),
+            "humidity_pct": env.get("humidity_pct"),
+            "wind_speed_ms": env.get("wind_speed_ms"),
+            "solar_irradiance_wm2": env.get("solar_irradiance_wm2"),
+            "water_level_m": env.get("water_level_m"),
+        })
 
 
 def get_telemetry(meta: dict | None = None) -> dict[str, Any]:
@@ -95,7 +113,7 @@ def get_telemetry(meta: dict | None = None) -> dict[str, Any]:
             "maintenance": raw.get("last_maintenance", "normal") if i % 17 == 0 else "normal",
         })
 
-    return {
+    result = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "live": True,
         "environment": {
@@ -111,6 +129,24 @@ def get_telemetry(meta: dict | None = None) -> dict[str, Any]:
             "building_count": n,
             "twin_version": meta.get("twin_version", "1.0.0"),
         },
+    }
+    _record_history(result)
+    return result
+
+
+def get_telemetry_history(minutes: int = 60) -> dict[str, Any]:
+    """Return telemetry samples from the last N minutes."""
+    minutes = max(1, min(1440, minutes))
+    cutoff = time.time() - minutes * 60
+    with _HISTORY_LOCK:
+        samples = [s for s in _HISTORY if s["t"] >= cutoff]
+        if not samples and _HISTORY:
+            samples = list(_HISTORY)
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "minutes": minutes,
+        "count": len(samples),
+        "samples": samples,
     }
 
 
@@ -204,8 +240,13 @@ def get_alarms(meta: dict | None = None) -> dict[str, Any]:
     }
 
 
+def telemetry_json() -> str:
+    return json.dumps(get_telemetry(), ensure_ascii=False)
+
+
 ROUTES = {
     "/api/telemetry": get_telemetry,
+    "/api/telemetry/history": get_telemetry_history,
     "/api/assets": get_assets,
     "/api/alarms": get_alarms,
 }
@@ -226,7 +267,21 @@ class TwinAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/api/telemetry/history":
+            qs = parse_qs(parsed.query)
+            minutes = int(qs.get("minutes", ["60"])[0])
+            body = json.dumps(get_telemetry_history(minutes), ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         handler = ROUTES.get(path)
         if not handler:
             self.send_response(404)
@@ -252,7 +307,7 @@ def main():
     args = ap.parse_args()
     httpd = ThreadingHTTPServer((args.host, args.port), TwinAPIHandler)
     print(f"Twin API: http://{args.host}:{args.port}")
-    print("  /api/telemetry  /api/assets  /api/alarms")
+    print("  /api/telemetry  /api/telemetry/history  /api/assets  /api/alarms")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

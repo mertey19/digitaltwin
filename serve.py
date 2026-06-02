@@ -124,7 +124,13 @@ def main():
     args = ap.parse_args()
 
     handler = partial(Handler, directory=HERE)
-    httpd = ThreadingHTTPServer((args.host, args.port), handler)
+    try:
+        httpd = ThreadingHTTPServer((args.host, args.port), handler)
+    except OSError as exc:
+        print(f"HATA: {args.host}:{args.port} portunda sunucu baslatilamadi: {exc}")
+        print("Baska bir program bu portu kullaniyor olabilir.")
+        print(f"Deneyin: python serve.py --port {args.port + 1}")
+        raise SystemExit(1) from exc
     url = f"http://{args.host}:{args.port}/{args.page}"
     print(f"Serving {HERE}")
     print(f"Open:    {url}")

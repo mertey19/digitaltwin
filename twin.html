@@ -493,6 +493,7 @@ let measurePoints = [], areaPoints = [], measureLine = null, measureMarkers = []
 let areaMesh = null, pinGroup = null;
 let profilePoints = [], profileLine = null;
 let demoActive = false, demoStep = 0, demoT = 0;
+let zoomTargetDistance = null, zoomMinDistance = 1.2, zoomMaxDistance = 140;
 let compareOverlay = null;
 let pins = JSON.parse(sessionStorage.getItem(PINS_KEY) || '[]');
 let seasonTint = null;
@@ -611,10 +612,12 @@ function buildScene(albedo, normalTex) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
+  controls.enableZoom = false;
   controls.maxPolarAngle = Math.PI * 0.495;
   controls.target.copy(initialTarget);
   updateCameraClipPlanes();
   updateOrbitLimits();
+  syncZoomTarget();
 
   sky = new Sky();
   sky.scale.setScalar(diag * 12);
@@ -714,8 +717,13 @@ function updateCameraClipPlanes() {
 function updateOrbitLimits() {
   const diag = siteDiag();
   const peak = maxTerrainY();
-  controls.minDistance = Math.max(1.2, peak * 0.06 + 0.8);
-  controls.maxDistance = diag * 3.2;
+  zoomMinDistance = Math.max(4.5, diag * 0.11, peak * 0.32);
+  zoomMaxDistance = diag * 3.4;
+  controls.minDistance = zoomMinDistance;
+  controls.maxDistance = zoomMaxDistance;
+  zoomTargetDistance = zoomTargetDistance === null
+    ? camera.position.distanceTo(controls.target)
+    : clampCameraDistance(zoomTargetDistance);
 }
 
 function clampCameraAboveTerrain() {
@@ -732,6 +740,62 @@ function clampCameraAboveTerrain() {
     else dir.normalize();
     camera.position.copy(controls.target).addScaledVector(dir, minDist);
   }
+}
+
+function syncZoomTarget() {
+  if (!camera || !controls) return;
+  zoomTargetDistance = camera.position.distanceTo(controls.target);
+}
+
+function clampCameraDistance(distance) {
+  return Math.max(zoomMinDistance, Math.min(zoomMaxDistance, distance));
+}
+
+function setCameraDistance(distance) {
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() < 1e-8) dir.set(0, 0.35, 1);
+  else dir.normalize();
+  camera.position.copy(controls.target).addScaledVector(dir, clampCameraDistance(distance));
+}
+
+function terrainHitFromEvent(ev) {
+  if (!terrain || !renderer) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  return raycaster.intersectObject(terrain)[0] || null;
+}
+
+function onWheelZoom(ev) {
+  if (ev.target.closest('.panel') || ev.target.closest('#statusbar')) return;
+  ev.preventDefault();
+  demoActive = false;
+
+  const unit = ev.deltaMode === 1 ? 18 : ev.deltaMode === 2 ? window.innerHeight : 1;
+  const delta = Math.max(-220, Math.min(220, ev.deltaY * unit));
+  const current = camera.position.distanceTo(controls.target);
+  const from = zoomTargetDistance ?? current;
+  zoomTargetDistance = clampCameraDistance(from * Math.exp(delta * 0.00125));
+
+  if (delta < 0) {
+    const hit = terrainHitFromEvent(ev);
+    if (hit) {
+      const oldTarget = controls.target.clone();
+      controls.target.lerp(hit.point, 0.16);
+      camera.position.add(controls.target.clone().sub(oldTarget).multiplyScalar(0.72));
+    }
+  }
+}
+
+function updateSmoothZoom(dt) {
+  if (!camera || !controls) return;
+  if (demoActive) { syncZoomTarget(); return; }
+  if (zoomTargetDistance === null) syncZoomTarget();
+  const current = camera.position.distanceTo(controls.target);
+  const next = THREE.MathUtils.damp(current, zoomTargetDistance, 12, dt);
+  setCameraDistance(next);
+  if (Math.abs(next - zoomTargetDistance) < 0.015) zoomTargetDistance = next;
 }
 
 function uvToLatLon(u, v) {
@@ -1451,6 +1515,7 @@ function focusBuilding(idx) {
   const y = terrainElevationAt(b.u, b.v) + b.height_m * exag * 1.5;
   camera.position.lerp(new THREE.Vector3(wx + 15, y + 10, wz + 15), 0.3);
   controls.target.set(wx, terrainElevationAt(b.u, b.v), wz);
+  syncZoomTarget();
   showBuildingInspect(idx);
 }
 
@@ -1622,11 +1687,13 @@ function updateDemoTour(dt) {
     if (water) {
       controls.target.set(0, water.position.y, 0);
       camera.position.set(0, water.position.y + diag * 0.3, diag * 0.4);
+      syncZoomTarget();
     }
   } else if (demoStep === 99 && demoT > 4) {
     demoActive = false;
     camera.position.copy(initialCamPos);
     controls.target.copy(initialTarget);
+    syncZoomTarget();
   }
 }
 
@@ -1659,7 +1726,9 @@ $('minimap-canvas').addEventListener('click', ev => {
   const x = (ev.clientX - rect.left) / rect.width;
   const y = (ev.clientY - rect.top) / rect.height;
   const W = meta.width_m, H = meta.height_m;
-  controls.target.set((x - 0.5) * W, controls.target.y, (y - 0.5) * H);
+  const wx = (x - 0.5) * W, wz = (y - 0.5) * H;
+  controls.target.set(wx, terrainElevationAt(x, y), wz);
+  syncZoomTarget();
 });
 
 // --- Camera presets ---
@@ -1678,6 +1747,7 @@ function applyPreset(name) {
   }
   camera.position.set(...p.pos);
   controls.target.set(...p.target);
+  syncZoomTarget();
   controls.update();
 }
 
@@ -1818,7 +1888,7 @@ function initKeyboard() {
   window.addEventListener('keydown', ev => {
     if (ev.target.matches('input, textarea, select')) return;
     const k = ev.key.toLowerCase();
-    if (k === 'r') { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); showToast('Görünüm sıfırlandı'); }
+    if (k === 'r') { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); syncZoomTarget(); showToast('Görünüm sıfırlandı'); }
     else if (k === 'w') { $('wireframe-chk').checked = !wireframeMode; toggleWireframe(!wireframeMode); }
     else if (k === 'd') startDemoTour();
     else if (k === 'm') { activeTool = 'measure'; document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === 'measure')); $('sb-tool').textContent = 'Araç: Mesafe'; clearMeasure(); }
@@ -1873,7 +1943,7 @@ function wireUI() {
   $('preset-view').addEventListener('change', () => { applyPreset($('preset-view').value); $('preset-view').value = ''; });
   $('btn-screenshot').addEventListener('click', exportScreenshot);
   $('btn-demo').addEventListener('click', startDemoTour);
-  $('btn-reset').addEventListener('click', () => { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); });
+  $('btn-reset').addEventListener('click', () => { demoActive = false; camera.position.copy(initialCamPos); controls.target.copy(initialTarget); syncZoomTarget(); });
   $('btn-export').addEventListener('click', exportSceneReport);
   $('btn-share').addEventListener('click', copyShareLink);
   $('inspect-close').addEventListener('click', () => $('inspect').classList.remove('visible'));
@@ -1932,6 +2002,7 @@ function wireUI() {
 
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('click', onClick);
+  renderer.domElement.addEventListener('wheel', onWheelZoom, { passive: false });
   window.addEventListener('resize', onResize);
   setupComposer();
 }
@@ -1955,6 +2026,7 @@ function onResize() {
 let frames = 0, fpsT = 0, lastT = performance.now();
 function animate() {
   requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
   const now = performance.now();
   frames++; fpsT += now - lastT; lastT = now;
   if (fpsT >= 500) {
@@ -1964,9 +2036,9 @@ function animate() {
     updateAlarmsUI();
   }
   controls.update();
-  clampCameraAboveTerrain();
-  const dt = clock.getDelta();
   updateDemoTour(dt);
+  updateSmoothZoom(dt);
+  clampCameraAboveTerrain();
   const hour = +$('tod').value;
   updateBuildingNightGlow(hour);
   if (waterMat?.uniforms) {

@@ -295,7 +295,7 @@ function buildScene(albedo, normalTex) {
   const W = meta.width_m, H = meta.height_m;
   const diag = Math.hypot(W, H);
 
-  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, diag * 8);
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, diag * 8);
   initialCamPos = new THREE.Vector3(W * 0.15, meta.max_elev_m * 3 + diag * 0.42, H * 1.1 + diag * 0.18);
   initialTarget = new THREE.Vector3(0, meta.max_elev_m * 0.5, 0);
   camera.position.copy(initialCamPos);
@@ -304,9 +304,9 @@ function buildScene(albedo, normalTex) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
   controls.maxPolarAngle = Math.PI * 0.495; // don't go under the ground
-  controls.minDistance = diag * 0.05;
-  controls.maxDistance = diag * 3.0;
   controls.target.copy(initialTarget);
+  updateCameraClipPlanes();
+  updateOrbitLimits();
 
   // ---- Sky ----
   sky = new Sky();
@@ -399,6 +399,7 @@ function buildTerrain(detail) {
   terrain.rotation.x = -Math.PI / 2; // lay flat, +Y up
   terrain.castShadow = true;
   terrain.receiveShadow = true;
+  terrain.frustumCulled = false;
   scene.add(terrain);
 
   applyDisplacement();
@@ -433,6 +434,49 @@ function applyDisplacement() {
 function terrainElevationAt(u, v) {
   const n = sampleBilinear(heightData, u, v);
   return (meta.min_elev_m + n * (meta.max_elev_m - meta.min_elev_m)) * exag;
+}
+
+function worldToUV(wx, wz) {
+  const W = meta.width_m, H = meta.height_m;
+  return { u: (wx / W) + 0.5, v: (wz / H) + 0.5 };
+}
+
+function siteDiag() {
+  return Math.hypot(meta.width_m, meta.height_m);
+}
+
+function maxTerrainY() {
+  return meta.max_elev_m * exag;
+}
+
+function updateCameraClipPlanes() {
+  const diag = siteDiag();
+  camera.near = Math.max(0.01, diag * 0.00025);
+  camera.far = Math.max(diag * 8, maxTerrainY() * 6 + diag * 2);
+  camera.updateProjectionMatrix();
+}
+
+function updateOrbitLimits() {
+  const diag = siteDiag();
+  const peak = maxTerrainY();
+  controls.minDistance = Math.max(1.2, peak * 0.06 + 0.8);
+  controls.maxDistance = diag * 3.0;
+}
+
+function clampCameraAboveTerrain() {
+  const { u, v } = worldToUV(controls.target.x, controls.target.z);
+  if (u < 0 || u > 1 || v < 0 || v > 1) return;
+  const surfaceY = terrainElevationAt(u, v);
+  const minY = surfaceY + 0.5;
+  if (camera.position.y < minY) camera.position.y = minY;
+  const minDist = controls.minDistance;
+  const dist = camera.position.distanceTo(controls.target);
+  if (dist < minDist) {
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-8) dir.set(0, 1, 0);
+    else dir.normalize();
+    camera.position.copy(controls.target).addScaledVector(dir, minDist);
+  }
 }
 
 // ----------------------------------------------------------------------- //
@@ -594,6 +638,8 @@ function wireControls() {
     applyDisplacement();
     positionBuildings();
     updateWaterLevel();
+    updateCameraClipPlanes();
+    updateOrbitLimits();
   });
 
   document.getElementById('detail').addEventListener('change', (e) => {
@@ -691,6 +737,7 @@ function animate() {
     frames = 0; fpsT = 0;
   }
   controls.update();
+  clampCameraAboveTerrain();
   animateWater(clock.getElapsedTime());
   if (useSSAO && composer) composer.render();
   else renderer.render(scene, camera);

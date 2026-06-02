@@ -603,7 +603,7 @@ function buildScene(albedo, normalTex) {
   scene = new THREE.Scene();
   const W = meta.width_m, H = meta.height_m, diag = Math.hypot(W, H);
 
-  camera = new THREE.PerspectiveCamera(55, renderer.domElement.clientWidth / renderer.domElement.clientHeight, 0.5, diag * 8);
+  camera = new THREE.PerspectiveCamera(55, renderer.domElement.clientWidth / renderer.domElement.clientHeight, 0.01, diag * 8);
   initialCamPos = new THREE.Vector3(W * 0.12, meta.max_elev_m * 3.2 + diag * 0.38, H * 1.05 + diag * 0.15);
   initialTarget = new THREE.Vector3(0, meta.max_elev_m * 0.4, 0);
   camera.position.copy(initialCamPos);
@@ -612,9 +612,9 @@ function buildScene(albedo, normalTex) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
   controls.maxPolarAngle = Math.PI * 0.495;
-  controls.minDistance = diag * 0.04;
-  controls.maxDistance = diag * 3.2;
   controls.target.copy(initialTarget);
+  updateCameraClipPlanes();
+  updateOrbitLimits();
 
   sky = new Sky();
   sky.scale.setScalar(diag * 12);
@@ -674,6 +674,7 @@ function buildTerrain(detail) {
   terrain = new THREE.Mesh(geometry, terrainMaterial);
   terrain.rotation.x = -Math.PI / 2;
   terrain.castShadow = terrain.receiveShadow = true;
+  terrain.frustumCulled = false;
   scene.add(terrain);
   applyDisplacement();
 }
@@ -693,6 +694,44 @@ function terrainElevationAt(u, v) {
 function worldToUV(wx, wz) {
   const W = meta.width_m, H = meta.height_m;
   return { u: (wx / W) + 0.5, v: (wz / H) + 0.5 };
+}
+
+function siteDiag() {
+  return Math.hypot(meta.width_m, meta.height_m);
+}
+
+function maxTerrainY() {
+  return meta.max_elev_m * exag;
+}
+
+function updateCameraClipPlanes() {
+  const diag = siteDiag();
+  camera.near = Math.max(0.01, diag * 0.00025);
+  camera.far = Math.max(diag * 8, maxTerrainY() * 6 + diag * 2);
+  camera.updateProjectionMatrix();
+}
+
+function updateOrbitLimits() {
+  const diag = siteDiag();
+  const peak = maxTerrainY();
+  controls.minDistance = Math.max(1.2, peak * 0.06 + 0.8);
+  controls.maxDistance = diag * 3.2;
+}
+
+function clampCameraAboveTerrain() {
+  const { u, v } = worldToUV(controls.target.x, controls.target.z);
+  if (u < 0 || u > 1 || v < 0 || v > 1) return;
+  const surfaceY = terrainElevationAt(u, v);
+  const minY = surfaceY + 0.5;
+  if (camera.position.y < minY) camera.position.y = minY;
+  const minDist = controls.minDistance;
+  const dist = camera.position.distanceTo(controls.target);
+  if (dist < minDist) {
+    const dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 1e-8) dir.set(0, 1, 0);
+    else dir.normalize();
+    camera.position.copy(controls.target).addScaledVector(dir, minDist);
+  }
 }
 
 function uvToLatLon(u, v) {
@@ -804,6 +843,7 @@ function buildWater() {
   water = new THREE.Mesh(waterGeo, waterMat);
   water.rotation.x = -Math.PI / 2;
   water.receiveShadow = true;
+  water.renderOrder = 1;
   water.position.y = (meta.water_level_m || 0) * exag;
   scene.add(water);
 }
@@ -1668,6 +1708,9 @@ function setupComposer() {
     composer.addPass(new RenderPass(scene, camera));
     try {
       ssaoPass = new SSAOPass(scene, camera, renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+      ssaoPass.kernelRadius = 6;
+      ssaoPass.minDistance = 0.001;
+      ssaoPass.maxDistance = 0.08;
       ssaoPass.enabled = false;
       composer.addPass(ssaoPass);
     } catch (_) {}
@@ -1921,6 +1964,7 @@ function animate() {
     updateAlarmsUI();
   }
   controls.update();
+  clampCameraAboveTerrain();
   const dt = clock.getDelta();
   updateDemoTour(dt);
   const hour = +$('tod').value;

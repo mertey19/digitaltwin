@@ -30,8 +30,7 @@ jobs:
         run: |
           python -c "import twin_api; import serve; import ws_handler"
           python -c "import ingest_real_dataset; import stitch_mosaic; import run_twin"
-          python -c "from twin_api import get_telemetry, get_telemetry_history, get_assets, get_alarms"
-          python -c "assert get_telemetry_history(5)['count'] >= 0"
+          python -c "from twin_api import get_telemetry, get_telemetry_history, get_assets, get_alarms; assert get_telemetry_history(5)['count'] >= 0"
 
       - name: Optional lint (ruff)
         continue-on-error: true

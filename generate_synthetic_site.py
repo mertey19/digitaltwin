@@ -25,6 +25,7 @@ Usage:
 import argparse
 import json
 import os
+from datetime import datetime, timezone
 
 import numpy as np
 from PIL import Image
@@ -236,7 +237,7 @@ def build_orthomosaic(elev_m, slope, masks, normals, seed, max_elev):
 
     # --- buildings on the plateau ----------------------------------------- #
     plateau = masks["plateau"]
-    building_map = _scatter_buildings(res, plateau > 0.5, rng)
+    building_map, footprints = _scatter_buildings(res, plateau > 0.5, rng)
     roof_tint = rng.random((res, res, 1)).astype(np.float32) * np.array([0.25, 0.15, 0.12])
     roof = np.array([0.55, 0.45, 0.40]) + roof_tint - 0.06
     roof = np.clip(roof, 0, 1)
@@ -257,15 +258,37 @@ def build_orthomosaic(elev_m, slope, masks, normals, seed, max_elev):
     # subtle global contrast / color grade
     rgb = np.clip((rgb - 0.5) * 1.06 + 0.5 + 0.01, 0, 1)
 
-    return (rgb * 255).astype(np.uint8)
+    # --- trees: forest patches on gentle vegetated ground --------------- #
+    forest_ok = (slope_n < 0.40) & (elev_n > 0.08) & (elev_n < 0.78)
+    forest_ok = forest_ok & (water_mask < 0.3) & (building_map < 0.5) & (road < 0.5)
+    fy, fx = np.where(forest_ok)
+    tree_points = []
+    if len(fx) > 0:
+        n_trees = int(min(320, max(60, len(fx) // 1100)))
+        sel = rng.choice(len(fx), n_trees, replace=False)
+        trad = max(3, res // 190)
+        oy, ox = np.ogrid[-trad:trad + 1, -trad:trad + 1]
+        disc = (ox * ox + oy * oy) <= trad * trad
+        tcol = np.array([0.15, 0.33, 0.13], dtype=np.float32)
+        for k in sel:
+            cy, cx = int(fy[k]), int(fx[k])
+            y0, y1 = max(0, cy - trad), min(res, cy + trad + 1)
+            x0, x1 = max(0, cx - trad), min(res, cx + trad + 1)
+            dm = disc[:y1 - y0, :x1 - x0]
+            patch = rgb[y0:y1, x0:x1]
+            patch[dm] = patch[dm] * 0.4 + tcol * 0.6
+            tree_points.append((cx, cy, trad))
+
+    return (rgb * 255).astype(np.uint8), footprints, tree_points
 
 
 def _scatter_buildings(res, area_mask, rng):
     """Place axis-aligned rectangular building footprints inside area_mask."""
     out = np.zeros((res, res), dtype=np.float32)
+    footprints = []
     ys, xs = np.where(area_mask)
     if len(xs) == 0:
-        return out
+        return out, footprints
     y0, y1 = ys.min(), ys.max()
     x0, x1 = xs.min(), xs.max()
     n = max(8, int((x1 - x0) * (y1 - y0) / (res * res) * 220))
@@ -276,7 +299,8 @@ def _scatter_buildings(res, area_mask, rng):
         cy = rng.integers(y0, max(y0 + 1, y1 - bh))
         if area_mask[cy:cy + bh, cx:cx + bw].mean() > 0.85:
             out[cy:cy + bh, cx:cx + bw] = 1.0
-    return out
+            footprints.append((int(cx), int(cy), int(bw), int(bh)))
+    return out, footprints
 
 
 # --------------------------------------------------------------------------- #
@@ -334,7 +358,7 @@ def main():
     slope, normals = compute_slope_normals(elev_m, cell)
 
     print("[3/5] Synthesizing orthomosaic...")
-    ortho = build_orthomosaic(elev_m, slope, masks, normals, args.seed, max_elev)
+    ortho, footprints, tree_points = build_orthomosaic(elev_m, slope, masks, normals, args.seed, max_elev)
 
     print("[4/5] Building normal map...")
     nmap = build_normalmap(elev_m, cell, strength=1.0)
@@ -350,7 +374,54 @@ def main():
     )
     Image.fromarray(nmap, mode="RGB").save(os.path.join(DATA_DIR, "normalmap.png"))
 
+    # ---- buildings.json (footprints -> 3B prizma) --------------------- #
+    import random as _rnd
+    brng = _rnd.Random(args.seed + 123)
+    btypes = ["konut", "ofis", "depo", "sosyal", "teknik"]
+    buildings = []
+    for i, (cx, cy, bw, bh) in enumerate(footprints):
+        bheight = round(4.0 + brng.random() * 12.0, 2)
+        buildings.append({
+            "u": round((cx + bw / 2.0) / res, 5),
+            "v": round((cy + bh / 2.0) / res, 5),
+            "su": round(bw / res, 5), "sv": round(bh / res, 5),
+            "height_m": bheight, "density": round(0.4 + brng.random() * 0.6, 3),
+            "id": f"B-{i + 1:03d}", "type": btypes[i % len(btypes)],
+            "capacity": int(50 + bheight * 10),
+            "last_maintenance": f"2025-{brng.randint(1, 12):02d}-{brng.randint(1, 28):02d}",
+        })
+    with open(os.path.join(DATA_DIR, "buildings.json"), "w", encoding="utf-8") as f:
+        json.dump({"count": len(buildings), "buildings": buildings}, f, indent=2)
+
+    # ---- trees.json --------------------------------------------------- #
+    trng = _rnd.Random(args.seed + 77)
+    trees = []
+    for (cx, cy, trad) in tree_points:
+        th = round(4.0 + trng.random() * 9.0, 2)
+        trees.append({
+            "u": round(cx / res, 5), "v": round(cy / res, 5),
+            "height_m": th, "radius_m": round(1.5 + trng.random() * 2.5, 2),
+        })
+    with open(os.path.join(DATA_DIR, "trees.json"), "w", encoding="utf-8") as f:
+        json.dump({"count": len(trees), "trees": trees}, f, indent=2)
+
+    # ---- water (from carved river / lowest cells) --------------------- #
+    water_level_m = float(np.percentile(elev_m, 4.0))
+    water_coverage = float((elev_m <= water_level_m).mean())
+    has_water = bool(masks["river_water"].any())
+
     meta = {
+        "site_name": "Sentetik Saha",
+        "twin_version": "2.0.0",
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "asset_summary": {
+            "building_count": len(buildings),
+            "tree_count": len(trees),
+            "has_water": has_water,
+            "dataset_type": "synthetic",
+            "elevation_range_m": round(e_max - e_min, 3),
+            "site_area_m2": round(width_m * height_m, 1),
+        },
         "description": "Synthetic photogrammetry site (DSM + orthomosaic). "
                        "Drop-in compatible with WebODM/ODM GeoTIFF exports.",
         "resolution_px": res,
@@ -365,6 +436,11 @@ def main():
         "heightmap_encoding": "linear 0..65535 maps to [min_elev_m, max_elev_m]",
         "orthomosaic": "orthomosaic.jpg",
         "normalmap": "normalmap.png",
+        "buildings": "buildings.json",
+        "trees": "trees.json",
+        "has_water": has_water,
+        "water_level_m": round(water_level_m, 3),
+        "water_coverage": round(water_coverage, 4),
         "georef": {
             "origin_lat": args.origin_lat,
             "origin_lon": args.origin_lon,

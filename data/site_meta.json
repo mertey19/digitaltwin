@@ -1,4 +1,15 @@
 {
+  "site_name": "Sentetik Saha",
+  "twin_version": "2.0.0",
+  "last_updated": "2026-06-06T09:01:19.923829+00:00",
+  "asset_summary": {
+    "building_count": 20,
+    "tree_count": 320,
+    "has_water": true,
+    "dataset_type": "synthetic",
+    "elevation_range_m": 40.0,
+    "site_area_m2": 160000.0
+  },
   "description": "Synthetic photogrammetry site (DSM + orthomosaic). Drop-in compatible with WebODM/ODM GeoTIFF exports.",
   "resolution_px": 1024,
   "width_m": 400.0,
@@ -12,6 +23,11 @@
   "heightmap_encoding": "linear 0..65535 maps to [min_elev_m, max_elev_m]",
   "orthomosaic": "orthomosaic.jpg",
   "normalmap": "normalmap.png",
+  "buildings": "buildings.json",
+  "trees": "trees.json",
+  "has_water": true,
+  "water_level_m": 10.094,
+  "water_coverage": 0.04,
   "georef": {
     "origin_lat": 41.0082,
     "origin_lon": 28.9784,

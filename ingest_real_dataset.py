@@ -52,6 +52,12 @@ from collections import deque
 import numpy as np
 from PIL import Image, ImageFilter
 
+import sys as _sys
+try:
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(HERE, "data_real")
 

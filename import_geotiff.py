@@ -147,7 +147,7 @@ def enrich_buildings(buildings: list[dict]) -> list[dict]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="GeoTIFF ortho+DSM → data_real/")
     ap.add_argument("--ortho", required=True, help="Orthophoto GeoTIFF yolu")
-    ap.add_argument("--dsm", required=True, help="DSM GeoTIFF yolu (metre)")
+    ap.add_argument("--dsm", default=None, help="DSM GeoTIFF yolu (opsiyonel; yoksa duz)")
     ap.add_argument("--out", default=OUT_DEFAULT, help="Çıktı klasörü")
     ap.add_argument("--gsd", type=float, default=None,
                     help="m/piksel (bilinmiyorsa piksel boyutundan tahmin)")
@@ -159,7 +159,7 @@ def main() -> int:
     if not os.path.isfile(args.ortho):
         print(f"HATA: Ortho bulunamadı: {args.ortho}", file=sys.stderr)
         return 1
-    if not os.path.isfile(args.dsm):
+    if args.dsm and not os.path.isfile(args.dsm):
         print(f"HATA: DSM bulunamadı: {args.dsm}", file=sys.stderr)
         return 1
 
@@ -170,8 +170,13 @@ def main() -> int:
     ow, oh = ortho_rgb.shape[1], ortho_rgb.shape[0]
 
     print("[2/5] DSM okunuyor…")
-    dsm, dsm_meta = read_dsm(args.dsm)
-    dsm = resize_dsm_to_ortho(dsm, ow, oh)
+    if args.dsm:
+        dsm, dsm_meta = read_dsm(args.dsm)
+        dsm = resize_dsm_to_ortho(dsm, ow, oh)
+    else:
+        print("  DSM yok -> duz yukseklik (3B icerik bina+agac nesnelerinden).")
+        dsm = np.zeros((oh, ow), dtype=np.float64)
+        dsm_meta = None
 
     valid = dsm[np.isfinite(dsm)]
     if valid.size == 0:
@@ -230,6 +235,12 @@ def main() -> int:
     with open(os.path.join(args.out, "buildings.json"), "w", encoding="utf-8") as f:
         json.dump({"count": len(buildings), "buildings": buildings}, f, indent=2)
 
+    from ingest_real_dataset import extract_trees
+    trees = extract_trees(ortho_rgb, scene=None, mosaic_meta={"method": "exif_gps"})
+    with open(os.path.join(args.out, "trees.json"), "w", encoding="utf-8") as f:
+        json.dump({"count": len(trees), "trees": trees}, f, indent=2)
+    print(f"  {len(trees)} agac")
+
     meta = {
         "site_name": "GeoTIFF Sahası (WebODM/ODM)",
         "twin_version": "2.0.0",
@@ -245,7 +256,7 @@ def main() -> int:
         "synthetic": False,
         "source": {
             "orthomosaic_tif": os.path.basename(args.ortho),
-            "dsm_tif": os.path.basename(args.dsm),
+            "dsm_tif": os.path.basename(args.dsm) if args.dsm else None,
             "import_tool": "import_geotiff.py",
             "ortho_meta": ortho_meta,
             "dsm_meta": dsm_meta,
@@ -261,6 +272,7 @@ def main() -> int:
         "orthomosaic": "orthomosaic.jpg",
         "normalmap": "normalmap.png",
         "buildings": "buildings.json",
+        "trees": "trees.json",
         "has_water": False,
         "water_level_m": 0.0,
         "georef": {

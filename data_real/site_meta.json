@@ -1,7 +1,7 @@
 {
   "site_name": "Drone Sahas\u0131 (18 kare)",
   "twin_version": "2.0.0",
-  "last_updated": "2026-06-01T04:36:57.403852+00:00",
+  "last_updated": "2026-06-06T08:24:09.187195+00:00",
   "asset_summary": {
     "building_count": 61,
     "has_water": true,
@@ -38,6 +38,7 @@
   "orthomosaic": "orthomosaic.jpg",
   "normalmap": "normalmap.png",
   "buildings": "buildings.json",
+  "trees": "trees.json",
   "has_water": true,
   "water_level_m": 12.223,
   "water_coverage": 0.0333,

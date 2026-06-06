@@ -11,7 +11,7 @@
   },
   "output_scale": 0.35,
   "match_max_dim": 640,
-  "elapsed_s": 0.067,
+  "elapsed_s": 0.145,
   "orthomosaic": "mosaic.jpg",
   "heightmap": "heightmap.jpg",
   "images": [

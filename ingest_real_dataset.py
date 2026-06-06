@@ -473,6 +473,45 @@ def enrich_buildings(buildings: list[dict]) -> list[dict]:
     return out
 
 
+def extract_trees(ortho_rgb, scene=None, mosaic_meta=None, grid_cols=90, max_trees=600):
+    """Detect tree/vegetation canopy in the ortho and return tree points
+    (u, v in 0..1, height_m, radius_m). Trees = green-dominant, textured,
+    darker canopy (not flat pale lawn / not bright concrete)."""
+    H, W, _ = ortho_rgb.shape
+    rgb = ortho_rgb.astype(np.float32) / 255.0
+    _, ss, vv = rgb_to_hsv(rgb)
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    green = (g > r + 0.03) & (g > b + 0.02)
+    canopy = green & (vv < 0.66) & (ss > 0.10)
+    cell = max(4, W // grid_cols)
+    gy, gx = H // cell, W // cell
+    frac = np.zeros((gy, gx), np.float32)
+    varv = np.zeros((gy, gx), np.float32)
+    for j in range(gy):
+        for i in range(gx):
+            y0, y1, x0, x1 = j * cell, (j + 1) * cell, i * cell, (i + 1) * cell
+            frac[j, i] = float(canopy[y0:y1, x0:x1].mean())
+            varv[j, i] = float(vv[y0:y1, x0:x1].var())
+    cells = (frac > 0.40) & (varv > 0.0012)
+    rng = np.random.default_rng(7)
+    trees = []
+    for j in range(gy):
+        for i in range(gx):
+            if not cells[j, i]:
+                continue
+            dens = float(frac[j, i])
+            cu = min(0.999, max(0.001, (i + 0.5 + rng.uniform(-0.35, 0.35)) / gx))
+            cv = min(0.999, max(0.001, (j + 0.5 + rng.uniform(-0.35, 0.35)) / gy))
+            h = round(float(4.0 + 8.0 * dens + rng.uniform(-1.0, 2.0)), 2)
+            rad = round(float(1.4 + 2.6 * dens), 2)
+            trees.append({"u": round(cu, 5), "v": round(cv, 5),
+                          "height_m": max(2.5, h), "radius_m": rad})
+    if len(trees) > max_trees:
+        keep = sorted(rng.choice(len(trees), max_trees, replace=False).tolist())
+        trees = [trees[k] for k in keep]
+    return trees
+
+
 # --------------------------------------------------------------------------- #
 # Water detection                                                             #
 # --------------------------------------------------------------------------- #
@@ -630,6 +669,13 @@ def main():
         json.dump({"count": len(buildings), "buildings": buildings}, f, indent=2)
     print(f"        -> {len(buildings)} footprints")
 
+    # ---- trees ------------------------------------------------------------ #
+    print("[4b/6] Extracting tree canopy...")
+    trees = extract_trees(ortho_rgb, scene, mosaic_meta)
+    with open(os.path.join(OUT_DIR, "trees.json"), "w", encoding="utf-8") as f:
+        json.dump({"count": len(trees), "trees": trees}, f, indent=2)
+    print(f"        -> {len(trees)} trees")
+
     # ---- water ------------------------------------------------------------ #
     print("[5/6] Detecting water...")
     has_water, water_frac, coverage = detect_water(ortho_rgb, h_norm, scene, mosaic_meta)
@@ -690,6 +736,7 @@ def main():
         "orthomosaic": "orthomosaic.jpg",
         "normalmap": "normalmap.png",
         "buildings": "buildings.json",
+        "trees": "trees.json",
         "has_water": bool(has_water),
         "water_level_m": water_level_m,
         "water_coverage": round(coverage, 5),

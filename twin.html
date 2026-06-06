@@ -351,6 +351,7 @@
     <option value="data">Sentetik</option>
   </select>
   <label class="chk"><input type="checkbox" id="buildingschk" checked /> Binalar</label>
+  <label class="chk"><input type="checkbox" id="treeschk" checked /> Ağaçlar</label>
   <label class="chk"><input type="checkbox" id="waterchk" checked /> Su</label>
   <label class="chk"><input type="checkbox" id="fogchk" checked /> Sis</label>
 </div>
@@ -463,6 +464,7 @@ let fxaaPass, bloomPass, useFXAA = true, useBloom = false;
 let terrain, geometry, terrainMaterial, heightTexture, heightData, baseHeights;
 let heatmapMesh = null, sceneDataFrames = null;
 let buildingsGroup, buildingMesh, buildingData, buildingGeo, buildingMat;
+let treesGroup = null, treeData = null;
 let water, waterMat, rainSystem = null;
 let flightPathGroup = null, flightMarker = null, flightCurve = null, flightT = 0;
 let meta, initialCamPos, initialTarget;
@@ -560,6 +562,10 @@ async function init() {
     setLoad(60, 'Binalar…');
     try { buildingData = await fetchJSON(`${DATA}/${meta.buildings}`); } catch (_) {}
   }
+  treeData = null;
+  if (meta.trees) {
+    try { treeData = await fetchJSON(`${DATA}/${meta.trees}`); } catch (_) {}
+  }
   setLoad(65, 'Sahne analizi…');
   try { sceneDataFrames = await fetchJSON('./scene_data.json'); } catch (_) {
     try { sceneDataFrames = await fetchJSON(`${DATA}/scene_data.json`); } catch (_) {}
@@ -568,6 +574,7 @@ async function init() {
   buildScene(albedo, normalTex);
   buildTerrain(currentDetail);
   buildBuildings();
+  buildTrees();
   buildWater();
   buildHeatmapOverlay();
   buildFlightPath();
@@ -854,6 +861,39 @@ function positionBuildings() {
   }
   buildingMesh.instanceMatrix.needsUpdate = true;
   if (buildingMesh.instanceColor) buildingMesh.instanceColor.needsUpdate = true;
+}
+
+function buildTrees() {
+  if (treesGroup) { scene.remove(treesGroup); treesGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); treesGroup = null; }
+  const list = treeData?.trees || [];
+  if (!list.length) return;
+  treesGroup = new THREE.Group();
+  const W = meta.width_m, H = meta.height_m;
+  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 1, 5);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4f2a, roughness: 0.95 });
+  const crownGeo = new THREE.IcosahedronGeometry(1, 0);
+  const crownMat = new THREE.MeshStandardMaterial({ color: 0x3f7d35, roughness: 0.9, flatShading: true });
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
+  const crowns = new THREE.InstancedMesh(crownGeo, crownMat, list.length);
+  trunks.castShadow = true; crowns.castShadow = true; crowns.receiveShadow = true;
+  crowns.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3), 3);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
+  for (let i = 0; i < list.length; i++) {
+    const t = list[i];
+    const wx = (t.u - 0.5) * W, wz = (t.v - 0.5) * H;
+    const baseY = terrainElevationAt(t.u, t.v);
+    const hgt = Math.max(2.5, t.height_m) * exag;
+    const trunkH = Math.max(0.8, hgt * 0.38);
+    const crownH = hgt - trunkH;
+    const crownR = Math.max(1.1, t.radius_m);
+    p.set(wx, baseY + trunkH / 2, wz); s.set(1, trunkH, 1); m.compose(p, q, s); trunks.setMatrixAt(i, m);
+    p.set(wx, baseY + trunkH + crownH * 0.5, wz); s.set(crownR, crownH * 0.62, crownR); m.compose(p, q, s); crowns.setMatrixAt(i, m);
+    const sh = 0.8 + (i % 5) * 0.05;
+    col.setRGB(0.22 * sh, 0.5 * sh, 0.2 * sh); crowns.setColorAt(i, col);
+  }
+  trunks.instanceMatrix.needsUpdate = true; crowns.instanceMatrix.needsUpdate = true;
+  if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
+  treesGroup.add(trunks); treesGroup.add(crowns); scene.add(treesGroup);
 }
 
 function buildWater() {
@@ -1952,6 +1992,7 @@ function wireUI() {
   $('time-axis').addEventListener('input', () => applyTimeAxis(+$('time-axis').value));
   applyTimeAxis(100);
   $('buildingschk').addEventListener('change', e => { if (buildingsGroup) buildingsGroup.visible = e.target.checked; });
+  $('treeschk')?.addEventListener('change', e => { if (treesGroup) treesGroup.visible = e.target.checked; });
   $('waterchk').addEventListener('change', e => { if (water) water.visible = e.target.checked; });
   $('fogchk').addEventListener('change', () => applyWeather($('weather').value));
   $('fxaa-chk').addEventListener('change', e => { useFXAA = e.target.checked; setPostFX(); });

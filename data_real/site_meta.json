@@ -1,62 +1,59 @@
 {
-  "site_name": "Drone Sahas\u0131 (18 kare)",
+  "site_name": "Aukerman Park (Cleveland, OH)",
   "twin_version": "2.0.0",
-  "last_updated": "2026-06-06T08:24:09.187195+00:00",
+  "last_updated": "2026-06-06T08:26:56.113839+00:00",
   "asset_summary": {
-    "building_count": 61,
-    "has_water": true,
-    "water_coverage_pct": 3.33,
-    "dataset_type": "real",
-    "stitch_method": "phase_correlation",
-    "elevation_range_m": 16.0,
-    "site_area_m2": 921.7
+    "building_count": 56,
+    "has_water": false,
+    "dataset_type": "geotiff_real",
+    "elevation_range_m": 1.0,
+    "site_area_m2": 96134.3
   },
-  "description": "REAL drone dataset (mosaic + approx. heightmap). Ingested by ingest_real_dataset.py.",
+  "description": "Imported from GeoTIFF via import_geotiff.py",
   "synthetic": false,
   "source": {
-    "orthomosaic": "mosaic.jpg",
-    "heightmap": "heightmap.jpg",
-    "mosaic_meta": "mosaic_meta.json",
-    "frames": 18,
-    "frame_native_px": [
-      4000,
-      2250
-    ],
-    "avg_concrete_ratio": 0.418,
-    "stitch_method": "phase_correlation"
+    "orthomosaic_tif": "odm_orthophoto.tif",
+    "dsm_tif": null,
+    "import_tool": "import_geotiff.py",
+    "ortho_meta": {
+      "width_px": 6938,
+      "height_px": 5544,
+      "transform": [
+        0.049994004822508833,
+        0.0,
+        436847.9202251881,
+        0.0,
+        -0.049992297306854394,
+        4572941.827023621
+      ],
+      "crs": "EPSG:32617",
+      "bounds": [
+        436847.9202251881,
+        4572664.6697273515,
+        437194.77863064664,
+        4572941.827023621
+      ]
+    },
+    "dsm_meta": null
   },
-  "resolution_px": 196,
-  "width_m": 29.4,
-  "height_m": 31.35,
+  "resolution_px": 4096,
+  "width_m": 346.858,
+  "height_m": 277.157,
   "min_elev_m": 0.0,
-  "max_elev_m": 16.0,
-  "elevation_range_m": 16.0,
-  "ground_sample_distance_m": 0.15,
+  "max_elev_m": 1.0,
+  "ground_sample_distance_m": 0.05,
   "heightmap": "heightmap.png",
   "heightmap_bits": 16,
-  "heightmap_encoding": "linear 0..65535 maps to [min_elev_m, max_elev_m]",
   "orthomosaic": "orthomosaic.jpg",
   "normalmap": "normalmap.png",
   "buildings": "buildings.json",
   "trees": "trees.json",
-  "has_water": true,
-  "water_level_m": 12.223,
-  "water_coverage": 0.0333,
-  "assumptions": {
-    "note": "Scale is ASSUMED. heightmap.jpg is an 8-bit JPEG with no absolute scale. width/height derived from GSD; elevation range chosen as plausible for a park/campground.",
-    "assumed_gsd_m_per_px": 0.15,
-    "assumed_elev_range_m": [
-      0.0,
-      16.0
-    ],
-    "stitch_processing": "Fast geometric stitch (phase_correlation, stitch_mosaic.py).",
-    "montage_grid": null,
-    "seam_processing": null
-  },
+  "has_water": false,
+  "water_level_m": 0.0,
   "georef": {
-    "origin_lat": 41.0082,
-    "origin_lon": 28.9784,
-    "crs": "EPSG:4326 (stub)",
-    "note": "Top-left (north-west) corner; stub only, not georeferenced."
+    "origin_lat": 41.5012,
+    "origin_lon": -81.6945,
+    "crs": "EPSG:32617",
+    "note": "GeoTIFF import — gerçek CRS meta'dan okunur (rasterio ile)."
   }
 }

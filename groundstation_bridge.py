@@ -81,6 +81,29 @@ def build_message(meta: dict, seq: int, image_rel: str, auth: str) -> dict:
             "altitudeM": float(meta.get("max_elev_m", 30.0) or 30.0),
             "yawDeg": 0.0, "pitchDeg": 0.0, "rollDeg": 0.0,
         },
+        # PDF 3.4.4 Golge Modu: VI-SLAM kestirimi (kucuk drift ile) — YKI'de
+        # GPS izi (mavi) + SLAM izi (turuncu) ayri cizilir, sapma hesaplanir.
+        "slamPose": {
+            "latitude": lat + 0.000015,
+            "longitude": lon + 0.000011,
+            "altitudeM": float(meta.get("max_elev_m", 30.0) or 30.0),
+            "yawDeg": 0.0, "pitchDeg": 0.0, "rollDeg": 0.0,
+            "confidence": 0.92,
+        },
+        # Mesh link metrikleri (YKI topoloji paneli). Gercek degerler icin
+        # mavlink_bridge.py --mesh-iface kullanin (batctl/iw okumasi).
+        "meshLink": {
+            "hopCount": 1, "signalDbm": -55.0, "snrDb": 21.0,
+            "latencyMs": 40.0, "packetLossPercent": 0.5,
+            "linkQualityPercent": 88.0, "relayModeActive": False,
+        },
+        "telemetry": {
+            "altitudeM": float(meta.get("max_elev_m", 30.0) or 30.0),
+            "speedMps": 0.0, "mode": "AUTO", "waypointIndex": 0,
+            "hopCount": 1, "signalDbm": -55.0, "snrDb": 21.0,
+            "latencyMs": 40.0, "packetLossPercent": 0.5,
+            "batteryPercent": 90.0, "batteryVoltage": 24.8,
+        },
         "imagery": {
             "pipeline": "custom",
             "mode": "single_mosaic",
